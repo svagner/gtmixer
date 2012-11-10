@@ -81,7 +81,8 @@ cb_digits_scale_vol(GtkWidget *widget, gpointer window)
 }
 
 gboolean
-*TimerFunc (GtkStatusIcon * trayIcon)
+*TimerFunc (gpointer trayIcon)
+//*TimerFunc (GtkStatusIcon * trayIcon)
 {
 	
 	pthread_mutex_lock(&mixer_mutex);
@@ -96,6 +97,7 @@ gboolean
 	    gtk_status_icon_set_from_file (trayIcon, TRAY_DEMUTE);
 	if (volstate == 0 || pcmstate == 0)
 	    gtk_status_icon_set_from_file (trayIcon, TRAY_VOLMUTE);
+	return 0;
 }
 
 static void
@@ -153,21 +155,17 @@ static
 int save_config(gpointer settings_window)
 {
 	FILE *conf;
-	struct 
-	{
-	    const gchar * dev;
-	    gint out;
-	    gint phone;
-	} newconf;
-
+	int status;
 	conf = fopen(CONFIGFILE, "wb");
 
-	newconf.dev = gtk_entry_get_text(GTK_ENTRY(devEntry));
-	newconf.out = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(outEntry));
-	newconf.phone = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(phoneEntry));
-	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n", newconf.dev, newconf.phone, newconf.out);
+	bzero(fconfig.device, sizeof(fconfig.device));
+	strcpy(fconfig.device, gtk_entry_get_text(GTK_ENTRY(devEntry)));
+	fconfig.ounit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(outEntry));
+	fconfig.punit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(phoneEntry));
+	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n", fconfig.device, fconfig.punit, fconfig.ounit);
 
-	fclose(conf);
+	status = fclose(conf);
+	return status;
 }
 
 static 
@@ -204,27 +202,9 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	GtkWidget *             SaveButton;
 	GtkWidget *             SaveFixed;
 	GtkWidget *             CloseFixed;
-	configuration config;
-	configuration * pconfig = &config;
-	FILE *conf;
 
-	config.device = device;
-	config.phone_unit=0;
-	config.out_unit=0;
-
-	if (ini_parse(CONFIGFILE, handler, &config) < 0) {
-		conf = fopen(CONFIGFILE, "wb");
-		fclose(conf);
-	}
-
-	// check variables
-	if (strlen(pconfig->device)==0)
-	{
-		strcpy(device, DEFAULTDEV);
-	}
-	
 #ifdef DEBUG
-	printf("[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n\n", pconfig->device, pconfig->phone_unit, pconfig->out_unit);
+	printf("[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n\n", fconfig.device, fconfig.punit, fconfig.ounit);
 #endif
 
 	settings_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -248,21 +228,21 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), devLabel, 0, 1, 0, 1);
 
 	devEntry = gtk_entry_new_with_max_length(15);
-	gtk_entry_set_text(GTK_ENTRY(devEntry), pconfig->device);
+	gtk_entry_set_text(GTK_ENTRY(devEntry), fconfig.device);
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), devEntry, 1, 2, 0, 1);
 
 	phoneLabel = gtk_label_new("Head Phone Unit: ");
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 0, 1, 1, 2);
 
 	phoneEntry = gtk_spin_button_new_with_range(0, 10, 1);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(phoneEntry), pconfig->phone_unit);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(phoneEntry), fconfig.punit);
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneEntry, 1, 2, 1, 2);
 
 	outLabel = gtk_label_new("Sound out Unit: ");
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), outLabel, 0, 1, 2, 3);
 
 	outEntry = gtk_spin_button_new_with_range(0, 10, 1);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(outEntry), pconfig->out_unit);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(outEntry), fconfig.ounit);
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), outEntry, 1, 2, 2, 3);
 
 	SaveFixed = gtk_fixed_new();
@@ -398,12 +378,6 @@ gui_loop()
 	gtk_table_attach_defaults(GTK_TABLE(table), frame,1, 2, 0, 1);
 	gtk_table_attach_defaults(GTK_TABLE(table), frame2, 1, 2, 1, 2);
 	gtk_table_attach_defaults(GTK_TABLE(table), checkphone, 1, 2, 2, 3);
-	/*gtk_table_attach(GTK_TABLE(table), frame3, 0, 1, 0, 1, GTK_FILL, GTK_FILL, 0, 0);
-	gtk_table_attach(GTK_TABLE(table), frame4, 0, 1, 1, 2, GTK_FILL, GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
-	gtk_table_attach(GTK_TABLE(table), frame5, 0, 1, 2, 3, GTK_FILL | GTK_EXPAND | GTK_SHRINK, GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
-	gtk_table_attach(GTK_TABLE(table), frame, 1, 2, 0, 1, GTK_FILL | GTK_EXPAND | GTK_SHRINK, GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
-	gtk_table_attach(GTK_TABLE(table), frame2, 1, 2, 1, 2, GTK_FILL | GTK_EXPAND | GTK_SHRINK, GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
-	gtk_table_attach(GTK_TABLE(table), checkphone, 1, 2, 2, 3, GTK_FILL | GTK_EXPAND | GTK_SHRINK, GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);*/
 
 	hscaleVol = gtk_hscale_new_with_range(0, 100, 1); 
 	gtk_scale_set_digits(GTK_SCALE(hscaleVol), 0);
@@ -469,17 +443,9 @@ gui_loop()
 	gtk_widget_show_all (menu);
 
 	/*timer*/
-	g_timeout_add_seconds(1,TimerFunc,trayIcon);
-	//gtk_widget_show_all(window);
-
-
-/* hide main window */
-	//gtk_window_iconify (GTK_WINDOW(window));
-	//is_tray=TRUE;
-
+	g_timeout_add_seconds(1,(GSourceFunc)TimerFunc,trayIcon);
 
 	gtk_main();
-
 }
 
 static void
@@ -730,6 +696,30 @@ main(int argc, char *argv[], char *envp[])
 	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
 	int	l, r, lrel, rrel;
 	int	ch, foo, bar, baz, dev, m, n, t;
+	configuration config;
+	configuration * pconfig = &config;
+	FILE *conf;
+
+	config.device = device;
+	config.phone_unit=0;
+	config.out_unit=0;
+
+	if (ini_parse(CONFIGFILE, handler, &config) < 0) {
+		conf = fopen(CONFIGFILE, "wb");
+		fclose(conf);
+	}
+
+	// check variables
+	if (strlen(pconfig->device)==0)
+	{
+		strcpy(device, DEFAULTDEV);
+	}
+	// init global variables
+	strcpy(fconfig.device, config.device);
+	fconfig.punit = config.phone_unit;
+	fconfig.ounit = config.out_unit;
+
+
 
 	if ((name = strdup(basename(argv[0]))) == NULL)
 		err(1, "strdup()");
