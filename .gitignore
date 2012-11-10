@@ -13,3 +13,6 @@
 
 # Build directory
 build
+
+# bak files
+*~
