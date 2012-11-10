@@ -16,3 +16,10 @@ build
 
 # bak files
 *~
+
+# tags exctags
+tags
+
+# compiled prog and manuals
+gtmixer
+*.1*
