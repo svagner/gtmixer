@@ -11,6 +11,13 @@ typedef struct
 	int out_unit;
 } configuration;
 
+struct 
+{
+	char device[20];
+	int punit;
+	int ounit;
+} fconfig;
+
 
 
 GtkWidget *		checkphone;
@@ -23,6 +30,7 @@ GtkWidget*		hscaleVol;
 GtkWidget*		hscalePcm; 
 GtkWidget*		devEntry;
 GtkWidget*		phoneEntry;
+GtkWidget*		outEntry;
 GtkStatusIcon *		trayIcon;
 
 extern int gui_init();

@@ -149,6 +149,27 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 	}
 }
 
+static
+int save_config(gpointer settings_window)
+{
+	FILE *conf;
+	struct 
+	{
+	    const gchar * dev;
+	    gint out;
+	    gint phone;
+	} newconf;
+
+	conf = fopen(CONFIGFILE, "wb");
+
+	newconf.dev = gtk_entry_get_text(GTK_ENTRY(devEntry));
+	newconf.out = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(outEntry));
+	newconf.phone = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(phoneEntry));
+	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n", newconf.dev, newconf.phone, newconf.out);
+
+	fclose(conf);
+}
+
 static 
 int handler(void* user, const char* section, const char* name,
 		const char* value)
@@ -201,6 +222,10 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	{
 		strcpy(device, DEFAULTDEV);
 	}
+	
+#ifdef DEBUG
+	printf("[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n\n", pconfig->device, pconfig->phone_unit, pconfig->out_unit);
+#endif
 
 	settings_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_window_set_title (GTK_WINDOW (settings_window), "GTMixer - Settings");
@@ -230,29 +255,34 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 0, 1, 1, 2);
 
 	phoneEntry = gtk_spin_button_new_with_range(0, 10, 1);
-	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(phoneEntry), pconfig->phone_unit);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(phoneEntry), pconfig->phone_unit);
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneEntry, 1, 2, 1, 2);
 
 	outLabel = gtk_label_new("Sound out Unit: ");
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), outLabel, 0, 1, 2, 3);
 
+	outEntry = gtk_spin_button_new_with_range(0, 10, 1);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(outEntry), pconfig->out_unit);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), outEntry, 1, 2, 2, 3);
+
 	SaveFixed = gtk_fixed_new();
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), SaveFixed, 0, 1, 3, 4);
 	SaveButton = gtk_button_new_with_label("Save");
-	gtk_button_set_alignment(GTK_BUTTON(SaveButton), 50, 10);
+	gtk_button_set_alignment(GTK_BUTTON(SaveButton), 50, 5);
 	gtk_widget_set_size_request(SaveButton, 80, 35);
 	gtk_button_set_relief(GTK_BUTTON(SaveButton), GTK_RELIEF_HALF);
-	gtk_fixed_put(GTK_FIXED(SaveFixed), SaveButton, 50, 50);
+	gtk_fixed_put(GTK_FIXED(SaveFixed), SaveButton, 50, 25);
 
 	CloseFixed = gtk_fixed_new();
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), CloseFixed, 1, 2, 3, 4);
 	CloseButton = gtk_button_new_with_label("Close");
-	gtk_button_set_alignment(GTK_BUTTON(CloseButton), 50, 10);
+	gtk_button_set_alignment(GTK_BUTTON(CloseButton), 50, 5);
 	gtk_widget_set_size_request(CloseButton, 80, 35);
 	gtk_button_set_relief(GTK_BUTTON(CloseButton), GTK_RELIEF_HALF);
-	gtk_fixed_put(GTK_FIXED(CloseFixed), CloseButton, 50, 50);
+	gtk_fixed_put(GTK_FIXED(CloseFixed), CloseButton, 50, 25);
 
 	// start event
+	g_signal_connect(G_OBJECT(SaveButton), "clicked", G_CALLBACK (save_config), (gpointer) settings_window);
 	g_signal_connect_swapped(G_OBJECT(CloseButton), "clicked", G_CALLBACK (gtk_widget_destroy), (gpointer) settings_window);
 
 	gtk_widget_show_all (settings_window);
