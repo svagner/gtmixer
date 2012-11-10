@@ -19,6 +19,7 @@
 #include <libgen.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <sys/types.h>
@@ -34,6 +35,7 @@
 
 #define gettext(x)      (x)
 
+#include "ini.h"
 #include "gtmixer.h"
 
 static pthread_mutex_t mixer_mutex;
@@ -78,7 +80,8 @@ cb_digits_scale_vol(GtkWidget *widget, gpointer window)
 	pthread_mutex_unlock(&mixer_mutex);
 }
 
-void *TimerFunc (GtkStatusIcon *trayIcon, gpointer window)
+gboolean
+*TimerFunc (GtkStatusIcon * trayIcon)
 {
 	
 	pthread_mutex_lock(&mixer_mutex);
@@ -146,36 +149,117 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 	}
 }
 
-/*void on_popup_clicked (GtkButton* button, GtkWidget* pWindow)
+static 
+int handler(void* user, const char* section, const char* name,
+		const char* value)
 {
-	GtkWidget *popup_window;
-	popup_window = gtk_window_new (GTK_WINDOW_POPUP);
-	gtk_window_set_title (GTK_WINDOW (popup_window), "Pop Up window");
-	gtk_container_set_border_width (GTK_CONTAINER (popup_window), 10);
-	gtk_window_set_resizable(GTK_WINDOW (popup_window), FALSE);
-	gtk_widget_set_size_request (popup_window, 150, 150);
-	gtk_window_set_transient_for(GTK_WINDOW (popup_window),GTK_WINDOW (pWindow));
-	gtk_window_set_position (GTK_WINDOW (popup_window),GTK_WIN_POS_CENTER);
-	g_signal_connect (G_OBJECT (button), "event",
-			G_CALLBACK (on_popup_window_event),NULL);
+	configuration* pconfig = (configuration*)user;
+
+#define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
+	if (MATCH("glogal", "version")) {
+		pconfig->version = strdup(value);
+	} else if (MATCH("global", "device")) {
+		pconfig->device = strdup(value);
+	} else if (MATCH("mixer", "phonehead")) {
+		pconfig->phone_unit = atoi(value);
+	} else if (MATCH("mixer", "out")) {
+		pconfig->out_unit = atoi(value);
+	} else {
+		return 0;  /* unknown section/name, error */
+	}
+
+	return 1;
+}
+
+static
+void SettingsActivated (GObject *trayicon, gpointer window)
+{
+	GtkWidget *		settings_window;
+	GtkWidget *             settings_table;
+	GtkWidget *             devLabel;
+	GtkWidget *             phoneLabel;
+	GtkWidget *             outLabel;
+	GtkWidget *             CloseButton;
+	GtkWidget *             SaveButton;
+	GtkWidget *             SaveFixed;
+	GtkWidget *             CloseFixed;
+	configuration config;
+	configuration * pconfig = &config;
+	FILE *conf;
+
+	config.device = device;
+	config.phone_unit=0;
+	config.out_unit=0;
+
+	if (ini_parse(CONFIGFILE, handler, &config) < 0) {
+		conf = fopen(CONFIGFILE, "wb");
+		fclose(conf);
+	}
+
+	// check variables
+	if (strlen(pconfig->device)==0)
+	{
+		strcpy(device, DEFAULTDEV);
+	}
+
+	settings_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+	gtk_window_set_title (GTK_WINDOW (settings_window), "GTMixer - Settings");
+	gtk_container_set_border_width (GTK_CONTAINER (settings_window), 10);
+	gtk_window_set_resizable(GTK_WINDOW (settings_window), FALSE);
+	gtk_widget_set_size_request (settings_window, 325, 175);
+	gtk_window_set_position (GTK_WINDOW (settings_window),GTK_WIN_POS_CENTER);
 
 	GdkColor color;
 	gdk_color_parse("#3b3131", &color);
-	gtk_widget_modify_bg(GTK_WIDGET(popup_window), GTK_STATE_NORMAL, &color);
+	gtk_widget_modify_bg(GTK_WIDGET(settings_window), GTK_STATE_NORMAL, &color);
+
+	settings_table = gtk_table_new(6, 2, FALSE);
+	gtk_table_set_row_spacings(GTK_TABLE(settings_table), 5);
+	gtk_table_set_col_spacings(GTK_TABLE(settings_table), 5);
+	gtk_container_add(GTK_CONTAINER(settings_window), settings_table);
 
 
-	gtk_widget_show_all (popup_window);
+	devLabel = gtk_label_new("Mixer device: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), devLabel, 0, 1, 0, 1);
+
+	devEntry = gtk_entry_new_with_max_length(15);
+	gtk_entry_set_text(GTK_ENTRY(devEntry), pconfig->device);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), devEntry, 1, 2, 0, 1);
+
+	phoneLabel = gtk_label_new("Head Phone Unit: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 0, 1, 1, 2);
+
+	phoneEntry = gtk_spin_button_new_with_range(0, 10, 1);
+	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(phoneEntry), pconfig->phone_unit);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneEntry, 1, 2, 1, 2);
+
+	outLabel = gtk_label_new("Sound out Unit: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), outLabel, 0, 1, 2, 3);
+
+	SaveFixed = gtk_fixed_new();
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), SaveFixed, 0, 1, 3, 4);
+	SaveButton = gtk_button_new_with_label("Save");
+	gtk_button_set_alignment(GTK_BUTTON(SaveButton), 50, 10);
+	gtk_widget_set_size_request(SaveButton, 80, 35);
+	gtk_button_set_relief(GTK_BUTTON(SaveButton), GTK_RELIEF_HALF);
+	gtk_fixed_put(GTK_FIXED(SaveFixed), SaveButton, 50, 50);
+
+	CloseFixed = gtk_fixed_new();
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), CloseFixed, 1, 2, 3, 4);
+	CloseButton = gtk_button_new_with_label("Close");
+	gtk_button_set_alignment(GTK_BUTTON(CloseButton), 50, 10);
+	gtk_widget_set_size_request(CloseButton, 80, 35);
+	gtk_button_set_relief(GTK_BUTTON(CloseButton), GTK_RELIEF_HALF);
+	gtk_fixed_put(GTK_FIXED(CloseFixed), CloseButton, 50, 50);
+
+	// start event
+	g_signal_connect_swapped(G_OBJECT(CloseButton), "clicked", G_CALLBACK (gtk_widget_destroy), (gpointer) settings_window);
+
+	gtk_widget_show_all (settings_window);
 }
 
-gboolean on_popup_window_event(GtkWidget *popup_window, GdkEventExpose *event)
-{
-	if(event->type == GDK_FOCUS_CHANGE)
-		gtk_widget_hide (popup_window);
-
-	return FALSE;
-}*/
-
-static void trayIconActivated(GObject *trayicon,  gpointer window) 
+static 
+void trayIconActivated(GObject *trayicon,  gpointer window) 
 {
 	gtk_widget_show_all (window);
 	if (is_tray==TRUE)
@@ -313,15 +397,17 @@ gui_loop()
 	gtk_container_add(GTK_CONTAINER(frame), hscaleVol);
 	gtk_container_add(GTK_CONTAINER(frame2), hscalePcm);
 
-	GtkStatusIcon *trayIcon = gtk_status_icon_new();
+	trayIcon = gtk_status_icon_new();
 	gtk_status_icon_set_from_file (trayIcon, TRAY_VOLMUTE);
 
 	menu = gtk_menu_new();
 
 	menuItemView = gtk_menu_item_new_with_label ("View");
+	menuItemSet = gtk_menu_item_new_with_label ("Settings");
 	Separator1 = gtk_separator_menu_item_new();
 	menuItemExit = gtk_menu_item_new_with_label ("Exit");
 	g_signal_connect (G_OBJECT (menuItemView), "activate", G_CALLBACK (trayView), window);
+	g_signal_connect (G_OBJECT (menuItemSet), "activate", GTK_SIGNAL_FUNC (SettingsActivated), window);
 	g_signal_connect (G_OBJECT (menuItemExit), "activate", G_CALLBACK (trayExit), NULL);
 
 	g_signal_connect(GTK_STATUS_ICON (trayIcon), "activate", GTK_SIGNAL_FUNC (trayIconActivated), window);
@@ -347,12 +433,13 @@ gui_loop()
 	    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
 
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemView);
+	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemSet);
 	gtk_menu_shell_append(GTK_MENU_SHELL (menu), Separator1);
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemExit);
 	gtk_widget_show_all (menu);
 
 	/*timer*/
-	    g_timeout_add_seconds(1,TimerFunc,trayIcon);
+	g_timeout_add_seconds(1,TimerFunc,trayIcon);
 	//gtk_widget_show_all(window);
 
 
@@ -604,7 +691,7 @@ set_mixer_state(char * mixprm, int st)
 }
 
 int
-main(int argc, char *argv[])
+main(int argc, char *argv[], char *envp[])
 {
 	char	mixer[PATH_MAX] = "/dev/mixer";
 	char	lstr[5], rstr[5];
