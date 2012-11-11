@@ -1,7 +1,7 @@
-gint is_tray=FALSE;
-int sndunit, sndunitnw, volstate, pcmstate;
-size_t len = sizeof(sndunit);
-char device[100];
+gint	is_tray=FALSE;
+int	sndunit, sndunitnw, volstate, pcmstate, mixer_desc=0;
+size_t	len = sizeof(sndunit);
+char	device[100];
 
 typedef struct
 {

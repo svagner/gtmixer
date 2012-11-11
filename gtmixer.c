@@ -46,6 +46,8 @@ static void	usage(int devmask, int recmask);
 static int	res_name(const char *name, int mask);
 static void	print_recsrc(int recsrc, int recmask, int sflag);
 
+pthread_t tid[2];
+
 int
 gui_init(int * ac, char *** av) {
     return gtk_init_check(ac, av);
@@ -85,10 +87,10 @@ gboolean
 //*TimerFunc (GtkStatusIcon * trayIcon)
 {
 	
-	pthread_mutex_lock(&mixer_mutex);
+//	pthread_mutex_lock(&mixer_mutex);
 	volstate=get_mixer_state("vol");
 	pcmstate=get_mixer_state("pcm");
-	pthread_mutex_unlock(&mixer_mutex);
+//	pthread_mutex_unlock(&mixer_mutex);
 	gtk_range_set_value(GTK_RANGE (hscaleVol), volstate);
 	gtk_range_set_value(GTK_RANGE (hscalePcm), pcmstate);
 	if (volstate > 50 && pcmstate > 50)
@@ -96,8 +98,10 @@ gboolean
 	if ((volstate < 50 && volstate > 0) && (pcmstate < 50 && pcmstate > 0))
 	    gtk_status_icon_set_from_file (trayIcon, TRAY_DEMUTE);
 	if (volstate == 0 || pcmstate == 0)
+	{
 	    gtk_status_icon_set_from_file (trayIcon, TRAY_VOLMUTE);
-	return 0;
+	}
+	return 1;
 }
 
 static void
@@ -137,7 +141,7 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 		g_print("Mic Enable!\n");
 #endif
 		sndunitnw=1;
-		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &sndunitnw, sizeof(sndunitnw)) < 0)
+		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.punit, sizeof(sndunitnw)) < 0)
 			perror("Sysctl hw.snd.default_unit");
 	}
 	else
@@ -146,7 +150,7 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 		g_print("Mic Disable!\n");
 #endif
 		sndunitnw=0;
-		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &sndunitnw, sizeof(&sndunitnw)) < 0)
+		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.ounit, sizeof(&sndunitnw)) < 0)
 			perror("Sysctl hw.snd.default_unit");
 	}
 }
@@ -519,13 +523,16 @@ print_recsrc(int recsrc, int recmask, int sflag)
 int
 get_mixer_state(char * mixprm)
 {
-	char	mixer[PATH_MAX] = "/dev/mixer";
+	//char	mixer[PATH_MAX] = "/dev/mixer";
+	char	mixer[PATH_MAX];
 	char	lstr[5], rstr[5];
 	char	*name, *eptr;
 	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
 	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
 	int	l, r, lrel, rrel;
 	int	ch, foo, bar, baz, dev, m, n, t;
+
+	strcpy(mixer, fconfig.device);
 
 	if ((name = strdup(basename(mixer))) == NULL)
 		err(1, "strdup()");
@@ -544,7 +551,8 @@ get_mixer_state(char * mixprm)
 		dusage = 1;
 
 	if ((baz = open(name, O_RDWR)) < 0)
-		err(1, "%s", name);
+			err(1, "%s", name);
+
 	if (ioctl(baz, SOUND_MIXER_READ_DEVMASK, &devmask) == -1)
 		err(1, "SOUND_MIXER_READ_DEVMASK");
 	if (ioctl(baz, SOUND_MIXER_READ_RECMASK, &recmask) == -1)
@@ -586,13 +594,16 @@ get_mixer_state(char * mixprm)
 int
 set_mixer_state(char * mixprm, int st)
 {
-	char	mixer[PATH_MAX] = "/dev/mixer";
+//	char	mixer[PATH_MAX] = "/dev/mixer";
+	char	mixer[PATH_MAX];
 	char	lstr[5], rstr[5];
 	char	*name, *eptr;
 	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
 	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
 	int	l, r, lrel, rrel;
 	int	ch, foo, bar, baz, dev, m, n, t;
+
+	strcpy(mixer, fconfig.device);
 
 	if ((name = strdup("mixer")) == NULL)
 		err(1, "strdup()");
@@ -608,7 +619,7 @@ set_mixer_state(char * mixprm, int st)
 
 	if (sflag && Sflag)
 		dusage = 1;
-
+	
 	if ((baz = open(name, O_RDWR)) < 0)
 		err(1, "%s", name);
 	if (ioctl(baz, SOUND_MIXER_READ_DEVMASK, &devmask) == -1)
@@ -689,7 +700,8 @@ set_mixer_state(char * mixprm, int st)
 int
 main(int argc, char *argv[], char *envp[])
 {
-	char	mixer[PATH_MAX] = "/dev/mixer";
+//	char	mixer[PATH_MAX] = "/dev/mixer";
+	char	mixer[PATH_MAX];
 	char	lstr[5], rstr[5];
 	char	*name, *eptr;
 	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
@@ -719,7 +731,7 @@ main(int argc, char *argv[], char *envp[])
 	fconfig.punit = config.phone_unit;
 	fconfig.ounit = config.out_unit;
 
-
+	strcpy(mixer, fconfig.device);
 
 	if ((name = strdup(basename(argv[0]))) == NULL)
 		err(1, "strdup()");
