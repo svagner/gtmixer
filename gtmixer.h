@@ -2,6 +2,7 @@ gint	is_tray=FALSE;
 int	sndunit, sndunitnw, volstate, pcmstate, mixer_desc=0;
 size_t	len = sizeof(sndunit);
 char	device[100];
+int	vol_ischanged=FALSE, pcm_ischanged=FALSE;
 
 typedef struct
 {
@@ -13,6 +14,7 @@ typedef struct
 
 struct 
 {
+	char directory[255];
 	char device[20];
 	int punit;
 	int ounit;
@@ -46,14 +48,13 @@ extern void checkphone_toogle_signal(GtkWidget *widget, gpointer window);
 static void trayView(GtkMenuItem *item, gpointer window);
 static void trayExit(GtkMenuItem *item, gpointer user_data);
 static void trayIconPopup(GtkStatusIcon *status_icon, guint button, guint32 activate_time, gpointer popUpMenu);
-//extern gboolean *TimerFunc (GtkStatusIcon *);
-extern gboolean *TimerFunc (gpointer);
+extern gboolean * TimerFunc (gpointer);
 extern void cb_digits_scale_vol(GtkWidget *widget, gpointer window);
 extern void cb_digits_scale_pcm(GtkWidget *widget, gpointer window);
 static gboolean on_popup_window_event(GtkWidget*, GdkEventExpose*);
 
 #define SHAREPATH "/usr/local/share/gtmixer/"
-#define CONFIGFILE "/home/vagner/.gtmixerrc"
+#define CONFIGFILE "/.gtmixerrc"
 #define DEFAULTDEV "/dev/mixer"
 
 #define PANEL_Y_SIZE 25

@@ -68,6 +68,8 @@ cb_digits_scale_pcm(GtkWidget *widget, gpointer window)
 	    pthread_mutex_lock(&mixer_mutex);
 	set_mixer_state("pcm", pcmstate);
 	    pthread_mutex_unlock(&mixer_mutex);
+
+	    pcm_ischanged=TRUE;
 }
 
 void
@@ -80,6 +82,7 @@ cb_digits_scale_vol(GtkWidget *widget, gpointer window)
 	pthread_mutex_lock(&mixer_mutex);
 	set_mixer_state("vol", volstate);
 	pthread_mutex_unlock(&mixer_mutex);
+	vol_ischanged=TRUE;
 }
 
 gboolean
@@ -92,20 +95,22 @@ gboolean
 	volstate=get_mixer_state("vol");
 	pcmstate=get_mixer_state("pcm");
 
-	if (volstate != old_volstate || pcmstate != old_pcmstate)
+	if ((volstate != old_volstate || pcmstate != old_pcmstate) || (vol_ischanged==TRUE || pcm_ischanged==TRUE))
 	{
 		gtk_range_set_value(GTK_RANGE (hscaleVol), volstate);
 		gtk_range_set_value(GTK_RANGE (hscalePcm), pcmstate);
 		if (volstate > 50 && pcmstate > 50)
 			gtk_status_icon_set_from_file (trayIcon, TRAY_INMUTE);
-		if ((volstate < 50 && volstate > 0) && (pcmstate < 50 && pcmstate > 0))
+		if ((volstate > 0 && volstate <= 50) || (pcmstate > 0 && pcmstate <= 50))
 			gtk_status_icon_set_from_file (trayIcon, TRAY_DEMUTE);
 		if (volstate == 0 || pcmstate == 0)
 		{
 			gtk_status_icon_set_from_file (trayIcon, TRAY_VOLMUTE);
 		}
+		vol_ischanged=FALSE;
+		pcm_ischanged=FALSE;
 	}
-	return 1;
+	return (gboolean *)1;
 }
 
 static void
@@ -165,7 +170,8 @@ int save_config(gpointer settings_window)
 {
 	FILE *conf;
 	int status;
-	conf = fopen(CONFIGFILE, "wb");
+
+	conf = fopen(fconfig.directory, "wb");
 
 	bzero(fconfig.device, sizeof(fconfig.device));
 	strcpy(fconfig.device, gtk_entry_get_text(GTK_ENTRY(devEntry)));
@@ -457,38 +463,6 @@ gui_loop()
 	gtk_main();
 }
 
-static void
-usage(int devmask, int recmask)
-{
-	int	i, n;
-
-	printf("usage: mixer [-f device] [-s | -S] [dev [+|-][voll[:[+|-]volr]] ...\n"
-	    "       mixer [-f device] [-s | -S] recsrc ...\n"
-	    "       mixer [-f device] [-s | -S] {^|+|-|=}rec rdev ...\n");
-	if (devmask != 0) {
-		printf(" devices: ");
-		for (i = 0, n = 0; i < SOUND_MIXER_NRDEVICES; i++)
-			if ((1 << i) & devmask)  {
-				if (n)
-					printf(", ");
-				printf("%s", names[i]);
-				n++;
-			}
-	}
-	if (recmask != 0) {
-		printf("\n rec devices: ");
-		for (i = 0, n = 0; i < SOUND_MIXER_NRDEVICES; i++)
-			if ((1 << i) & recmask)  {
-				if (n)
-					printf(", ");
-				printf("%s", names[i]);
-				n++;
-			}
-	}
-	printf("\n");
-	exit(1);
-}
-
 static int
 res_name(const char *name, int mask)
 {
@@ -704,6 +678,7 @@ int
 main(int argc, char *argv[], char *envp[])
 {
 	char	mixer[PATH_MAX];
+	char	fconfdir[PATH_MAX];
 	char	lstr[5], rstr[5];
 	char	*name, *eptr;
 	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
@@ -714,12 +689,16 @@ main(int argc, char *argv[], char *envp[])
 	configuration * pconfig = &config;
 	FILE *conf;
 
+	strcpy(fconfdir,getenv("HOME"));
+	strcat(fconfdir,CONFIGFILE);
+	strcpy(fconfig.directory,fconfdir);
+
 	config.device = device;
 	config.phone_unit=0;
 	config.out_unit=0;
 
-	if (ini_parse(CONFIGFILE, handler, &config) < 0) {
-		conf = fopen(CONFIGFILE, "wb");
+	if (ini_parse(fconfig.directory, handler, &config) < 0) {
+		conf = fopen(fconfig.directory, "wb");
 		fclose(conf);
 	}
 
@@ -751,213 +730,6 @@ main(int argc, char *argv[], char *envp[])
 	}
 
 	gui_loop();
-
-	n = 1;
-	for (;;) {
-		if (n >= argc || *argv[n] != '-')
-			break;
-		if (strlen(argv[n]) != 2) {
-			if (strcmp(argv[n] + 1, "rec") != 0)
-				dusage = 1;
-			break;
-		}
-		ch = *(argv[n] + 1);
-		if (ch == 'f' && n < argc - 1) {
-			name = argv[n + 1];
-			n += 2;
-		} else if (ch == 's') {
-			sflag = 1;
-			n++;
-		} else if (ch == 'S') {
-			Sflag = 1;
-			n++;
-		} else {
-			dusage = 1;
-			break;
-		}
-	}
-	if (sflag && Sflag)
-		dusage = 1;
-
-	argc -= n - 1;
-	argv += n - 1;
-
-	if ((baz = open(name, O_RDWR)) < 0)
-		err(1, "%s", name);
-	if (ioctl(baz, SOUND_MIXER_READ_DEVMASK, &devmask) == -1)
-		err(1, "SOUND_MIXER_READ_DEVMASK");
-	if (ioctl(baz, SOUND_MIXER_READ_RECMASK, &recmask) == -1)
-		err(1, "SOUND_MIXER_READ_RECMASK");
-	if (ioctl(baz, SOUND_MIXER_READ_RECSRC, &recsrc) == -1)
-		err(1, "SOUND_MIXER_READ_RECSRC");
-	orecsrc = recsrc;
-
-	if (argc == 1 && dusage == 0) {
-		for (foo = 0, n = 0; foo < SOUND_MIXER_NRDEVICES; foo++) {
-			if (!((1 << foo) & devmask))
-				continue;
-			if (ioctl(baz, MIXER_READ(foo),&bar) == -1) {
-			   	warn("MIXER_READ");
-				continue;
-			}
-			if (Sflag || sflag) {
-				printf("%s%s%c%d:%d", n ? " " : "",
-				    names[foo], Sflag ? ':' : ' ',
-				    bar & 0x7f, (bar >> 8) & 0x7f);
-				n++;
-			} else
-				printf("Mixer %-8s is currently set to "
-				    "%3d:%d\n", names[foo], bar & 0x7f,
-				    (bar >> 8) & 0x7f);
-		}
-		if (n && recmask)
-			printf(" ");
-		print_recsrc(recsrc, recmask, Sflag || sflag);
-		return (0);
-	}
-
-	argc--;
-	argv++;
-
-	n = 0;
-	while (argc > 0 && dusage == 0) {
-		if (strcmp("recsrc", *argv) == 0) {
-			drecsrc = 1;
-			argc--;
-			argv++;
-			continue;
-		} else if (strcmp("rec", *argv + 1) == 0) {
-			if (**argv != '+' && **argv != '-' &&
-			    **argv != '=' && **argv != '^') {
-				warnx("unknown modifier: %c", **argv);
-				dusage = 1;
-				break;
-			}
-			if (argc <= 1) {
-				warnx("no recording device specified");
-				dusage = 1;
-				break;
-			}
-			if ((dev = res_name(argv[1], recmask)) == -1) {
-				warnx("unknown recording device: %s", argv[1]);
-				dusage = 1;
-				break;
-			}
-			switch (**argv) {
-			case '+':
-				recsrc |= (1 << dev);
-				break;
-			case '-':
-				recsrc &= ~(1 << dev);
-				break;
-			case '=':
-				recsrc = (1 << dev);
-				break;
-			case '^':
-				recsrc ^= (1 << dev);
-				break;
-			}
-			drecsrc = 1;
-			argc -= 2;
-			argv += 2;
-			continue;
-		}
-
-		if ((t = sscanf(*argv, "%d:%d", &l, &r)) > 0)
-			dev = 0;
-		else if ((dev = res_name(*argv, devmask)) == -1) {
-			warnx("unknown device: %s", *argv);
-			dusage = 1;
-			break;
-		}
-
-		lrel = rrel = 0;
-		if (argc > 1) {
-			m = sscanf(argv[1], "%7[^:]:%7s", lstr, rstr);
-			if (m > 0) {
-				if (*lstr == '+' || *lstr == '-')
-					lrel = rrel = 1;
-				l = strtol(lstr, NULL, 10);
-			}
-			if (m > 1) {
-				if (*rstr == '+' || *rstr == '-')
-					rrel = 1;
-				r = strtol(rstr, NULL, 10);
-			}
-		}
-
-		switch (argc > 1 ? m : t) {
-		case 0:
-			if (ioctl(baz, MIXER_READ(dev), &bar) == -1) {
-				warn("MIXER_READ");
-				argc--;
-				argv++;
-				continue;
-			}
-			if (Sflag || sflag) {
-				printf("%s%s%c%d:%d", n ? " " : "",
-				    names[dev], Sflag ? ':' : ' ',
-				    bar & 0x7f, (bar >> 8) & 0x7f);
-				n++;
-			} else
-				printf("Mixer %-8s is currently set to "
-				    "%3d:%d\n", names[dev], bar & 0x7f,
-				    (bar >> 8) & 0x7f);
-
-			argc--;
-			argv++;
-			break;
-		case 1:
-			r = l;
-			/* FALLTHROUGH */
-		case 2:
-			if (ioctl(baz, MIXER_READ(dev), &bar) == -1) {
-				warn("MIXER_READ");
-				argc--;
-				argv++;
-				continue;
-			}
-
-			if (lrel)
-				l = (bar & 0x7f) + l;
-			if (rrel)
-				r = ((bar >> 8) & 0x7f) + r;
-
-			if (l < 0)
-				l = 0;
-			else if (l > 100)
-				l = 100;
-			if (r < 0)
-				r = 0;
-			else if (r > 100)
-				r = 100;
-
-			if (!Sflag)
-				printf("Setting the mixer %s from %d:%d to "
-				    "%d:%d.\n", names[dev], bar & 0x7f,
-				    (bar >> 8) & 0x7f, l, r);
-
-			l |= r << 8;
-			if (ioctl(baz, MIXER_WRITE(dev), &l) == -1)
-				warn("WRITE_MIXER");
-
-			argc -= 2;
-			argv += 2;
- 			break;
-		}
-	}
-
-	if (orecsrc != recsrc) {
-		if (ioctl(baz, SOUND_MIXER_WRITE_RECSRC, &recsrc) == -1)
-			err(1, "SOUND_MIXER_WRITE_RECSRC");
-		if (ioctl(baz, SOUND_MIXER_READ_RECSRC, &recsrc) == -1)
-			err(1, "SOUND_MIXER_READ_RECSRC");
-	}
-
-	if (drecsrc)
-		print_recsrc(recsrc, recmask, Sflag || sflag);
-
-	close(baz);
 
 	return (0);
 }
