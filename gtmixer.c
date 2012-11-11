@@ -84,22 +84,26 @@ cb_digits_scale_vol(GtkWidget *widget, gpointer window)
 
 gboolean
 *TimerFunc (gpointer trayIcon)
-//*TimerFunc (GtkStatusIcon * trayIcon)
 {
-	
-//	pthread_mutex_lock(&mixer_mutex);
+	int old_volstate, old_pcmstate;
+
+	old_volstate = volstate;
+	old_pcmstate = pcmstate;
 	volstate=get_mixer_state("vol");
 	pcmstate=get_mixer_state("pcm");
-//	pthread_mutex_unlock(&mixer_mutex);
-	gtk_range_set_value(GTK_RANGE (hscaleVol), volstate);
-	gtk_range_set_value(GTK_RANGE (hscalePcm), pcmstate);
-	if (volstate > 50 && pcmstate > 50)
-	    gtk_status_icon_set_from_file (trayIcon, TRAY_INMUTE);
-	if ((volstate < 50 && volstate > 0) && (pcmstate < 50 && pcmstate > 0))
-	    gtk_status_icon_set_from_file (trayIcon, TRAY_DEMUTE);
-	if (volstate == 0 || pcmstate == 0)
+
+	if (volstate != old_volstate || pcmstate != old_pcmstate)
 	{
-	    gtk_status_icon_set_from_file (trayIcon, TRAY_VOLMUTE);
+		gtk_range_set_value(GTK_RANGE (hscaleVol), volstate);
+		gtk_range_set_value(GTK_RANGE (hscalePcm), pcmstate);
+		if (volstate > 50 && pcmstate > 50)
+			gtk_status_icon_set_from_file (trayIcon, TRAY_INMUTE);
+		if ((volstate < 50 && volstate > 0) && (pcmstate < 50 && pcmstate > 0))
+			gtk_status_icon_set_from_file (trayIcon, TRAY_DEMUTE);
+		if (volstate == 0 || pcmstate == 0)
+		{
+			gtk_status_icon_set_from_file (trayIcon, TRAY_VOLMUTE);
+		}
 	}
 	return 1;
 }
@@ -127,6 +131,7 @@ void on_focus_out (GtkWidget* window)
 {
 #ifdef DEBUG
 	printf("Out\n");
+
 #endif
 	gtk_widget_hide (window);
 	gtk_window_iconify(GTK_WINDOW(window));
@@ -523,7 +528,6 @@ print_recsrc(int recsrc, int recmask, int sflag)
 int
 get_mixer_state(char * mixprm)
 {
-	//char	mixer[PATH_MAX] = "/dev/mixer";
 	char	mixer[PATH_MAX];
 	char	lstr[5], rstr[5];
 	char	*name, *eptr;
@@ -594,7 +598,6 @@ get_mixer_state(char * mixprm)
 int
 set_mixer_state(char * mixprm, int st)
 {
-//	char	mixer[PATH_MAX] = "/dev/mixer";
 	char	mixer[PATH_MAX];
 	char	lstr[5], rstr[5];
 	char	*name, *eptr;
@@ -700,7 +703,6 @@ set_mixer_state(char * mixprm, int st)
 int
 main(int argc, char *argv[], char *envp[])
 {
-//	char	mixer[PATH_MAX] = "/dev/mixer";
 	char	mixer[PATH_MAX];
 	char	lstr[5], rstr[5];
 	char	*name, *eptr;
