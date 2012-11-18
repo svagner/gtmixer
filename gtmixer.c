@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <gtk/gtk.h>
 #include <cairo/cairo.h>
+#include <pango/pango.h>
 
 #include <err.h>
 #include <errno.h>
@@ -56,6 +57,16 @@ gui_init(int * ac, char *** av) {
 static void destroy (GtkWidget *window, gpointer data)
 {
 	gtk_main_quit ();
+}
+
+void 
+set_app_font (const char *fontname)
+{
+	GtkSettings *settings;
+
+	settings = gtk_settings_get_default();
+	g_object_set(G_OBJECT(settings), "gtk-font-name", fontname,
+			NULL);
 }
 
 void
@@ -210,13 +221,28 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 {
 	GtkWidget *		settings_window;
 	GtkWidget *             settings_table;
+	GtkWidget *             settings_table_p2;
+	GtkWidget *             settings_table_p3;
 	GtkWidget *             devLabel;
 	GtkWidget *             phoneLabel;
 	GtkWidget *             outLabel;
+	GtkWidget *             micLabel;
+	GtkWidget *             colorLabel;
+	GtkWidget *             persLabel;
+	GtkWidget *             fontLabel;
+	GtkWidget *             GeneralPageLabel;
+	GtkWidget *             GeneralPage;
 	GtkWidget *             CloseButton;
 	GtkWidget *             SaveButton;
 	GtkWidget *             SaveFixed;
 	GtkWidget *             CloseFixed;
+	GtkWidget *		ColorSelect;
+	GtkWidget *		FontSelect;
+	GtkWidget *		HeadNote;
+	GtkWidget *		PersNote1Label;
+	GtkWidget *		PersNote2Label;
+	GtkWidget *		pVBox;
+	GtkWidget *		pHBox;
 
 #ifdef DEBUG
 	printf("[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n\n", fconfig.device, fconfig.punit, fconfig.ounit);
@@ -226,55 +252,108 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_window_set_title (GTK_WINDOW (settings_window), "GTMixer - Settings");
 	gtk_container_set_border_width (GTK_CONTAINER (settings_window), 10);
 	gtk_window_set_resizable(GTK_WINDOW (settings_window), FALSE);
-	gtk_widget_set_size_request (settings_window, 325, 175);
+	gtk_widget_set_size_request (settings_window, 725, 370);
 	gtk_window_set_position (GTK_WINDOW (settings_window),GTK_WIN_POS_CENTER);
 
 	GdkColor color;
-	gdk_color_parse("#3b3131", &color);
+	gdk_color_parse("#FFFFFF", &color);
 	gtk_widget_modify_bg(GTK_WIDGET(settings_window), GTK_STATE_NORMAL, &color);
 
-	settings_table = gtk_table_new(6, 2, FALSE);
+
+	GeneralPageLabel = gtk_label_new("General");
+	PersNote1Label = gtk_label_new("Window");
+	PersNote2Label = gtk_label_new("Font");	
+
+	pVBox = gtk_vbox_new(FALSE, 0);
+	gtk_container_add(GTK_CONTAINER(settings_window), pVBox);
+
+	/* Creation du GtkNotebook */
+	HeadNote = gtk_notebook_new();
+	gtk_box_pack_start(GTK_BOX(pVBox), HeadNote, TRUE, TRUE, 0);
+	gtk_notebook_set_scrollable(GTK_NOTEBOOK(HeadNote), TRUE);
+
+	settings_table = gtk_table_new(7, 6, FALSE);
 	gtk_table_set_row_spacings(GTK_TABLE(settings_table), 5);
 	gtk_table_set_col_spacings(GTK_TABLE(settings_table), 5);
-	gtk_container_add(GTK_CONTAINER(settings_window), settings_table);
 
+	gtk_notebook_append_page(GTK_NOTEBOOK(HeadNote), settings_table, GeneralPageLabel);
 
 	devLabel = gtk_label_new("Mixer device: ");
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), devLabel, 0, 1, 0, 1);
 
-	devEntry = gtk_entry_new_with_max_length(15);
+	devEntry = gtk_entry_new_with_max_length(55);
 	gtk_entry_set_text(GTK_ENTRY(devEntry), fconfig.device);
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), devEntry, 1, 2, 0, 1);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), devEntry, 1, 6, 0, 1);
+
+	micLabel = gtk_label_new("Microphone unit: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), micLabel, 0, 1, 1, 2);
+
+	micEntry = gtk_entry_new_with_max_length(55);
+	gtk_entry_set_text(GTK_ENTRY(micEntry), fconfig.mic);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), micEntry, 1, 2, 1, 2);
 
 	phoneLabel = gtk_label_new("Head Phone Unit: ");
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 0, 1, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 2, 3, 1, 2);
 
 	phoneEntry = gtk_spin_button_new_with_range(0, 10, 1);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(phoneEntry), fconfig.punit);
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneEntry, 1, 2, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneEntry, 3, 4, 1, 2);
 
 	outLabel = gtk_label_new("Sound out Unit: ");
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), outLabel, 0, 1, 2, 3);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), outLabel, 4, 5, 1, 2);
 
 	outEntry = gtk_spin_button_new_with_range(0, 10, 1);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(outEntry), fconfig.ounit);
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), outEntry, 1, 2, 2, 3);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), outEntry, 5, 6, 1, 2);
+
+	settings_table_p2 = gtk_table_new(7, 6, FALSE);
+	gtk_table_set_row_spacings(GTK_TABLE(settings_table), 5);
+	gtk_table_set_col_spacings(GTK_TABLE(settings_table), 5);
+
+	gtk_notebook_append_page(GTK_NOTEBOOK(HeadNote), settings_table_p2, PersNote1Label);
+
+	colorLabel = gtk_label_new("Window color: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table_p2), colorLabel, 0, 1, 1, 2);
+
+	ColorSelect = gtk_color_selection_new();
+	gtk_table_attach(GTK_TABLE(settings_table_p2), ColorSelect, 1, 6, 2, 3, 
+			GTK_FILL | GTK_EXPAND | GTK_SHRINK,
+			GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
+
+	settings_table_p3 = gtk_table_new(7, 6, FALSE);
+	gtk_table_set_row_spacings(GTK_TABLE(settings_table), 5);
+	gtk_table_set_col_spacings(GTK_TABLE(settings_table), 5);
+
+	gtk_notebook_append_page(GTK_NOTEBOOK(HeadNote), settings_table_p3, PersNote2Label);
+
+	fontLabel = gtk_label_new("Font: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table_p3), fontLabel, 0, 1, 5, 6);
+
+	FontSelect = gtk_font_selection_new();
+	gtk_table_attach(GTK_TABLE(settings_table_p3), FontSelect, 1, 6, 5, 6, 
+			GTK_FILL | GTK_EXPAND | GTK_SHRINK,
+			GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
+
+	pHBox = gtk_hbox_new(TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(pVBox), pHBox, TRUE, TRUE, 0);
 
 	SaveFixed = gtk_fixed_new();
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), SaveFixed, 0, 1, 3, 4);
+	gtk_box_pack_start(GTK_BOX(pHBox), SaveFixed, TRUE, TRUE, 0);
 	SaveButton = gtk_button_new_with_label("Save");
 	gtk_button_set_alignment(GTK_BUTTON(SaveButton), 50, 5);
 	gtk_widget_set_size_request(SaveButton, 80, 35);
 	gtk_button_set_relief(GTK_BUTTON(SaveButton), GTK_RELIEF_HALF);
 	gtk_fixed_put(GTK_FIXED(SaveFixed), SaveButton, 50, 25);
 
+
 	CloseFixed = gtk_fixed_new();
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), CloseFixed, 1, 2, 3, 4);
+	gtk_box_pack_start(GTK_BOX(pHBox), CloseFixed, TRUE, FALSE, 0);
 	CloseButton = gtk_button_new_with_label("Close");
 	gtk_button_set_alignment(GTK_BUTTON(CloseButton), 50, 5);
 	gtk_widget_set_size_request(CloseButton, 80, 35);
 	gtk_button_set_relief(GTK_BUTTON(CloseButton), GTK_RELIEF_HALF);
 	gtk_fixed_put(GTK_FIXED(CloseFixed), CloseButton, 50, 25);
+
 
 	// start event
 	g_signal_connect(G_OBJECT(SaveButton), "clicked", G_CALLBACK (save_config), (gpointer) settings_window);
@@ -363,6 +442,10 @@ gui_loop()
 	gtk_window_set_skip_taskbar_hint(GTK_WINDOW (window),TRUE);
 	gtk_window_stick(GTK_WINDOW (window));
 
+	GdkColor color;
+	gdk_color_parse("#FFFFFF", &color);
+	gtk_widget_modify_bg(GTK_WIDGET(window), GTK_STATE_NORMAL, &color);
+
 	table = gtk_table_new(3, 2, FALSE);
 	gtk_table_set_row_spacings(GTK_TABLE(table), 5);
 	gtk_table_set_col_spacings(GTK_TABLE(table), 5);
@@ -371,6 +454,7 @@ gui_loop()
 
 
 	frame = gtk_frame_new("Volume");
+	set_app_font("Sans 8");
 	g_signal_connect (frame, "focus-out-event", G_CALLBACK (on_focus_out), NULL);
 	gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_ETCHED_IN);
 
@@ -394,8 +478,17 @@ gui_loop()
 	gtk_table_attach_defaults(GTK_TABLE(table), frame2, 1, 2, 1, 2);
 	gtk_table_attach_defaults(GTK_TABLE(table), checkphone, 1, 2, 2, 3);
 
+
+	GdkColor color_scal;
+	gdk_color_parse("#ECECEC", &color_scal);
+
 	hscaleVol = gtk_hscale_new_with_range(0, 100, 1); 
 	gtk_scale_set_digits(GTK_SCALE(hscaleVol), 0);
+//	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_SELECTED, &color);
+//	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_NORMAL, &color);
+	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_ACTIVE, &color_scal);
+//	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_PRELIGHT, &color);
+//gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_INSENSITIVE, &color);
 	gtk_scale_add_mark (GTK_SCALE (hscaleVol), marks[0], GTK_POS_BOTTOM, labels[3]);
 	gtk_scale_add_mark (GTK_SCALE (hscaleVol), marks[2], GTK_POS_BOTTOM, labels[2]);
 	gtk_scale_set_value_pos(GTK_SCALE(hscaleVol), GTK_POS_LEFT);
@@ -404,6 +497,7 @@ gui_loop()
 
 	hscalePcm = gtk_hscale_new_with_range(0, 100, 1); 
 	gtk_scale_set_digits(GTK_SCALE(hscalePcm), 0);
+	gtk_widget_modify_bg(GTK_WIDGET(hscalePcm), GTK_STATE_ACTIVE, &color_scal);
 	gtk_scale_add_mark (GTK_SCALE (hscalePcm), marks[0], GTK_POS_BOTTOM, labels[3]);
 	gtk_scale_add_mark (GTK_SCALE (hscalePcm), marks[2], GTK_POS_BOTTOM, labels[2]);
 	gtk_range_set_update_policy (GTK_RANGE (hscalePcm),

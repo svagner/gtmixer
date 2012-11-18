@@ -15,7 +15,8 @@ typedef struct
 struct 
 {
 	char directory[255];
-	char device[20];
+	char device[55];
+	char mic[55];
 	int punit;
 	int ounit;
 } fconfig;
@@ -31,6 +32,7 @@ GtkWidget *		menuItemExit;
 GtkWidget*		hscaleVol; 
 GtkWidget*		hscalePcm; 
 GtkWidget*		devEntry;
+GtkWidget*		micEntry;
 GtkWidget*		phoneEntry;
 GtkWidget*		outEntry;
 GtkStatusIcon *		trayIcon;
@@ -38,6 +40,7 @@ GtkStatusIcon *		trayIcon;
 extern int gui_init();
 static void destroy (GtkWidget *window, gpointer data);
 extern void gui_loop();
+void set_app_font (const char *fontname);
 extern int get_mixer_state(char * mixprm);
 extern int set_mixer_state(char * mixprm, int st);
 static void trayIconActivated(GObject *trayicon, gpointer window);
