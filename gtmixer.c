@@ -38,7 +38,7 @@
 
 #include "ini.h"
 #include "gtmixer.h"
-
+#define  DEBUG 0
 static pthread_mutex_t mixer_mutex;
 
 const char	*names[SOUND_MIXER_NRDEVICES] = SOUND_DEVICE_NAMES;
@@ -73,7 +73,7 @@ void
 cb_digits_scale_pcm(GtkWidget *widget, gpointer window)
 {
 	pcmstate=gtk_range_get_value(GTK_RANGE (hscalePcm));
-#ifdef DEBUG	
+#if DEBUG==1	
 	printf("==> New PCM state is %d\n", pcmstate);
 #endif
 	    pthread_mutex_lock(&mixer_mutex);
@@ -87,7 +87,7 @@ void
 cb_digits_scale_vol(GtkWidget *widget, gpointer window)
 {
 	volstate=gtk_range_get_value(GTK_RANGE (hscaleVol));
-#ifdef DEBUG	
+#if DEBUG==1
 	printf("==> New PCM state is %d\n", volstate);
 #endif
 	pthread_mutex_lock(&mixer_mutex);
@@ -145,7 +145,7 @@ static void trayIconPopup(GtkStatusIcon *status_icon, guint button, guint32 acti
 
 void on_focus_out (GtkWidget* window)
 {
-#ifdef DEBUG
+#if DEBUG==1
 	printf("Out\n");
 
 #endif
@@ -158,7 +158,7 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 {
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkphone)))
 	{
-#ifdef DEBUG
+#if DEBUG==1
 		g_print("Mic Enable!\n");
 #endif
 		sndunitnw=1;
@@ -167,7 +167,7 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 	}
 	else
 	{
-#ifdef DEBUG
+#if DEBUG==1
 		g_print("Mic Disable!\n");
 #endif
 		sndunitnw=0;
@@ -177,10 +177,11 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 }
 
 static
-int save_config(gpointer settings_window)
+int save_config(gpointer set_window)
 {
 	FILE *conf;
 	int status;
+
 
 	conf = fopen(fconfig.directory, "wb");
 
@@ -188,9 +189,16 @@ int save_config(gpointer settings_window)
 	strcpy(fconfig.device, gtk_entry_get_text(GTK_ENTRY(devEntry)));
 	fconfig.ounit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(outEntry));
 	fconfig.punit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(phoneEntry));
-	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n", fconfig.device, fconfig.punit, fconfig.ounit);
+	gtk_color_selection_get_current_color (GTK_COLOR_SELECTION(ColorSelect), &fconfig.ncolor);
+	bzero(fconfig.nfont, sizeof(fconfig.nfont));
+	strcpy(fconfig.nfont,gtk_font_selection_get_font_name(GTK_FONT_SELECTION(FontSelect)));
+	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n\n[window]\npixel = %d\nred = %d\ngreen = %d\nblue = %d\nfont = %s\n", fconfig.device, fconfig.punit, fconfig.ounit, fconfig.ncolor.pixel, fconfig.ncolor.red, fconfig.ncolor.green, fconfig.ncolor.blue, fconfig.nfont);
 
 	status = fclose(conf);
+
+	gtk_widget_modify_bg(GTK_WIDGET(settings_window), GTK_STATE_NORMAL, &fconfig.ncolor);
+	gtk_widget_modify_bg(GTK_WIDGET(window), GTK_STATE_NORMAL, &fconfig.ncolor);
+	set_app_font(fconfig.nfont);
 	return status;
 }
 
@@ -203,12 +211,22 @@ int handler(void* user, const char* section, const char* name,
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
 	if (MATCH("glogal", "version")) {
 		pconfig->version = strdup(value);
-	} else if (MATCH("global", "device")) {
+	} else if (MATCH("general", "device")) {
 		pconfig->device = strdup(value);
 	} else if (MATCH("mixer", "phonehead")) {
 		pconfig->phone_unit = atoi(value);
 	} else if (MATCH("mixer", "out")) {
 		pconfig->out_unit = atoi(value);
+	} else if (MATCH("window", "pixel")) {
+		fconfig.ncolor.pixel = atoi(value);
+	} else if (MATCH("window", "red")) {
+		fconfig.ncolor.red = atoi(value);
+	} else if (MATCH("window", "green")) {
+		fconfig.ncolor.green = atoi(value);
+	} else if (MATCH("window", "blue")) {
+		fconfig.ncolor.blue = atoi(value);
+	} else if (MATCH("window", "font")) {
+		pconfig->font = strdup(value);
 	} else {
 		return 0;  /* unknown section/name, error */
 	}
@@ -219,7 +237,7 @@ int handler(void* user, const char* section, const char* name,
 static
 void SettingsActivated (GObject *trayicon, gpointer window)
 {
-	GtkWidget *		settings_window;
+
 	GtkWidget *             settings_table;
 	GtkWidget *             settings_table_p2;
 	GtkWidget *             settings_table_p3;
@@ -236,15 +254,13 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	GtkWidget *             SaveButton;
 	GtkWidget *             SaveFixed;
 	GtkWidget *             CloseFixed;
-	GtkWidget *		ColorSelect;
-	GtkWidget *		FontSelect;
 	GtkWidget *		HeadNote;
 	GtkWidget *		PersNote1Label;
 	GtkWidget *		PersNote2Label;
 	GtkWidget *		pVBox;
 	GtkWidget *		pHBox;
 
-#ifdef DEBUG
+#if DEBUG==1
 	printf("[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n\n", fconfig.device, fconfig.punit, fconfig.ounit);
 #endif
 
@@ -255,9 +271,10 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_widget_set_size_request (settings_window, 725, 370);
 	gtk_window_set_position (GTK_WINDOW (settings_window),GTK_WIN_POS_CENTER);
 
-	GdkColor color;
-	gdk_color_parse("#FFFFFF", &color);
-	gtk_widget_modify_bg(GTK_WIDGET(settings_window), GTK_STATE_NORMAL, &color);
+//	if (ncolor.pixer)
+//	GdkColor color;
+//	gdk_color_parse("#FFFFFF", &color);
+	gtk_widget_modify_bg(GTK_WIDGET(settings_window), GTK_STATE_NORMAL, &fconfig.ncolor);
 
 
 	GeneralPageLabel = gtk_label_new("General");
@@ -316,6 +333,7 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_table_attach_defaults(GTK_TABLE(settings_table_p2), colorLabel, 0, 1, 1, 2);
 
 	ColorSelect = gtk_color_selection_new();
+	gtk_color_selection_set_current_color(GTK_COLOR_SELECTION(ColorSelect), &fconfig.ncolor);
 	gtk_table_attach(GTK_TABLE(settings_table_p2), ColorSelect, 1, 6, 2, 3, 
 			GTK_FILL | GTK_EXPAND | GTK_SHRINK,
 			GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
@@ -330,9 +348,13 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_table_attach_defaults(GTK_TABLE(settings_table_p3), fontLabel, 0, 1, 5, 6);
 
 	FontSelect = gtk_font_selection_new();
+#if DEBUG==1
+	printf("Current Font=\"%s\"\n", fconfig.nfont);
+#endif
 	gtk_table_attach(GTK_TABLE(settings_table_p3), FontSelect, 1, 6, 5, 6, 
 			GTK_FILL | GTK_EXPAND | GTK_SHRINK,
 			GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
+	gtk_font_selection_set_font_name(FontSelect, fconfig.nfont); 
 
 	pHBox = gtk_hbox_new(TRUE, 0);
 	gtk_box_pack_start(GTK_BOX(pVBox), pHBox, TRUE, TRUE, 0);
@@ -371,7 +393,7 @@ void trayIconActivated(GObject *trayicon,  gpointer window)
 	gtk_widget_hide (window);
 	    gtk_window_iconify(GTK_WINDOW(window));
 	    is_tray=FALSE;
-#ifdef DEBUG
+#if DEBUG==1
 	    printf("Is tray = TRUE\n");
 #endif
 	}
@@ -379,7 +401,7 @@ void trayIconActivated(GObject *trayicon,  gpointer window)
 	{
 	    gtk_window_deiconify(GTK_WINDOW(window));
 	    is_tray=TRUE;
-#ifdef DEBUG
+#if DEBUG==1
 	    printf("Is tray = FALSE\n");
 #endif
 	}
@@ -393,7 +415,7 @@ void trayIconActivated(GObject *trayicon,  gpointer window)
 	else
 	    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
 
-#ifdef DEBUG
+#if DEBUG==1
 	printf("Unit: %d\n", sndunit);
 	printf("Activated!\n");
 #endif
@@ -404,8 +426,6 @@ void
 gui_loop()
 {
 	GParamSpec		*pspec;
-
-	GtkWidget *             window;
 	GtkWidget *             main_vbox;
 	GtkWidget *             top_graphic;
 	GtkWidget *             table_scrolled_window;
@@ -442,9 +462,7 @@ gui_loop()
 	gtk_window_set_skip_taskbar_hint(GTK_WINDOW (window),TRUE);
 	gtk_window_stick(GTK_WINDOW (window));
 
-	GdkColor color;
-	gdk_color_parse("#FFFFFF", &color);
-	gtk_widget_modify_bg(GTK_WIDGET(window), GTK_STATE_NORMAL, &color);
+	gtk_widget_modify_bg(GTK_WIDGET(window), GTK_STATE_NORMAL, &fconfig.ncolor);
 
 	table = gtk_table_new(3, 2, FALSE);
 	gtk_table_set_row_spacings(GTK_TABLE(table), 5);
@@ -454,7 +472,7 @@ gui_loop()
 
 
 	frame = gtk_frame_new("Volume");
-	set_app_font("Sans 8");
+	set_app_font(fconfig.nfont);
 	g_signal_connect (frame, "focus-out-event", G_CALLBACK (on_focus_out), NULL);
 	gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_ETCHED_IN);
 
@@ -484,11 +502,7 @@ gui_loop()
 
 	hscaleVol = gtk_hscale_new_with_range(0, 100, 1); 
 	gtk_scale_set_digits(GTK_SCALE(hscaleVol), 0);
-//	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_SELECTED, &color);
-//	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_NORMAL, &color);
 	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_ACTIVE, &color_scal);
-//	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_PRELIGHT, &color);
-//gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_INSENSITIVE, &color);
 	gtk_scale_add_mark (GTK_SCALE (hscaleVol), marks[0], GTK_POS_BOTTOM, labels[3]);
 	gtk_scale_add_mark (GTK_SCALE (hscaleVol), marks[2], GTK_POS_BOTTOM, labels[2]);
 	gtk_scale_set_value_pos(GTK_SCALE(hscaleVol), GTK_POS_LEFT);
@@ -742,7 +756,7 @@ set_mixer_state(char * mixprm, int st)
 			else if (r > 100)
 				r = 100;
 			if (!Sflag)
-#ifdef DEBUG	
+#if DEBUG==1	
 				printf("Setting the mixer %s from %d:%d to "
 				    "%d:%d.\n", names[dev], bar & 0x7f,
 				    (bar >> 8) & 0x7f, l, r);
@@ -788,8 +802,13 @@ main(int argc, char *argv[], char *envp[])
 	strcpy(fconfig.directory,fconfdir);
 
 	config.device = device;
+	config.font = device;
 	config.phone_unit=0;
 	config.out_unit=0;
+	fconfig.ncolor.pixel=0;
+	fconfig.ncolor.red=65535;
+	fconfig.ncolor.green=65535;
+	fconfig.ncolor.blue=65535;
 
 	if (ini_parse(fconfig.directory, handler, &config) < 0) {
 		conf = fopen(fconfig.directory, "wb");
@@ -799,10 +818,21 @@ main(int argc, char *argv[], char *envp[])
 	// check variables
 	if (strlen(pconfig->device)==0)
 	{
+#if DEBUG==1
+		printf("Not fount device - use default device!\n");
+#endif
 		strcpy(device, DEFAULTDEV);
+	}
+	if (strlen(pconfig->font)==0)
+	{
+#if DEBUG==1
+		printf("Use default font!\n");
+#endif
+		strcpy(font, DEFAULTFONT);
 	}
 	// init global variables
 	strcpy(fconfig.device, config.device);
+	strcpy(fconfig.nfont, config.font);
 	fconfig.punit = config.phone_unit;
 	fconfig.ounit = config.out_unit;
 

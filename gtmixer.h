@@ -2,12 +2,16 @@ gint	is_tray=FALSE;
 int	sndunit, sndunitnw, volstate, pcmstate, mixer_desc=0;
 size_t	len = sizeof(sndunit);
 char	device[100];
+char	font[100];
 int	vol_ischanged=FALSE, pcm_ischanged=FALSE;
+
 
 typedef struct
 {
 	const char* version;
 	const char* device;
+	const char* font;
+	GdkColor wincolor;
 	int phone_unit;
 	int out_unit;
 } configuration;
@@ -19,6 +23,8 @@ struct
 	char mic[55];
 	int punit;
 	int ounit;
+	GdkColor ncolor;
+	gchar nfont[100];
 } fconfig;
 
 
@@ -35,7 +41,14 @@ GtkWidget*		devEntry;
 GtkWidget*		micEntry;
 GtkWidget*		phoneEntry;
 GtkWidget*		outEntry;
+GtkWidget *		ColorSelect;
+GtkWidget *		FontSelect;
+GtkWidget *		settings_window;
+GtkWidget *             window;
 GtkStatusIcon *		trayIcon;
+
+
+
 
 extern int gui_init();
 static void destroy (GtkWidget *window, gpointer data);
@@ -59,6 +72,8 @@ static gboolean on_popup_window_event(GtkWidget*, GdkEventExpose*);
 #define SHAREPATH "/usr/local/share/gtmixer/"
 #define CONFIGFILE "/.gtmixerrc"
 #define DEFAULTDEV "/dev/mixer"
+
+#define DEFAULTFONT "Sans 8"
 
 #define PANEL_Y_SIZE 25
 #define TRAY_VOLMUTE "/usr/local/share/gtmixer/icons/tray/1.png"
