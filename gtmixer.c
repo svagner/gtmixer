@@ -199,6 +199,8 @@ int save_config(gpointer set_window)
 	gtk_widget_modify_bg(GTK_WIDGET(settings_window), GTK_STATE_NORMAL, &fconfig.ncolor);
 	gtk_widget_modify_bg(GTK_WIDGET(window), GTK_STATE_NORMAL, &fconfig.ncolor);
 	set_app_font(fconfig.nfont);
+	if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.ounit, sizeof(&sndunitnw)) < 0)
+		perror("Sysctl hw.snd.default_unit");
 	return status;
 }
 
@@ -354,7 +356,7 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_table_attach(GTK_TABLE(settings_table_p3), FontSelect, 1, 6, 5, 6, 
 			GTK_FILL | GTK_EXPAND | GTK_SHRINK,
 			GTK_FILL | GTK_EXPAND | GTK_SHRINK, 0, 0);
-	gtk_font_selection_set_font_name(FontSelect, fconfig.nfont); 
+	gtk_font_selection_set_font_name(GTK_FONT_SELECTION(FontSelect), fconfig.nfont); 
 
 	pHBox = gtk_hbox_new(TRUE, 0);
 	gtk_box_pack_start(GTK_BOX(pVBox), pHBox, TRUE, TRUE, 0);
