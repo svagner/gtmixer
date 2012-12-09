@@ -68,6 +68,8 @@ extern void gui_loop();
 void set_app_font (const char *fontname);
 extern int get_mixer_state(char * mixprm);
 extern void get_mixer_state_all ();
+extern void get_mixer_unit ();
+extern void clear_mixer_hash ();
 extern int set_mixer_state(char * mixprm, int st);
 static void trayIconActivated(GObject *trayicon, gpointer window);
 static void on_popup_clicked (GtkButton*, GtkWidget*);
