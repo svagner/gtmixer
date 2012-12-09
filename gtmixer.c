@@ -37,6 +37,7 @@
 #define gettext(x)      (x)
 
 #include "ini.h"
+#include "uthash.h"
 #include "gtmixer.h"
 #define  DEBUG 0
 static pthread_mutex_t mixer_mutex;
@@ -57,6 +58,17 @@ gui_init(int * ac, char *** av) {
 static void destroy (GtkWidget *window, gpointer data)
 {
 	gtk_main_quit ();
+}
+
+int
+get_mixer_unit_by_name(const char *mixname)
+{
+	struct mixerhash *mixerh;
+	mixerh = malloc(sizeof(struct mixerhash));
+	HASH_FIND_STR(mixerunits, mixname, mixerh);
+	if (mixerh)
+	    return mixerh->id;
+	return -1;
 }
 
 void 
@@ -105,6 +117,8 @@ gboolean
 	old_pcmstate = pcmstate;
 	volstate=get_mixer_state("vol");
 	pcmstate=get_mixer_state("pcm");
+//	if (GTK_RANGE(mixer_hscale[0]))
+	    	get_mixer_state_all();
 
 	if ((volstate != old_volstate || pcmstate != old_pcmstate) || (vol_ischanged==TRUE || pcm_ischanged==TRUE))
 	{
@@ -123,6 +137,7 @@ gboolean
 	}
 	return (gboolean *)1;
 }
+
 
 static void
 trayView(GtkMenuItem *item, gpointer window)
@@ -246,7 +261,7 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	GtkWidget *             devLabel;
 	GtkWidget *             phoneLabel;
 	GtkWidget *             outLabel;
-	GtkWidget *             micLabel;
+	GtkWidget *             FPLabel;
 	GtkWidget *             colorLabel;
 	GtkWidget *             persLabel;
 	GtkWidget *             fontLabel;
@@ -304,12 +319,12 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	gtk_entry_set_text(GTK_ENTRY(devEntry), fconfig.device);
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), devEntry, 1, 6, 0, 1);
 
-	micLabel = gtk_label_new("Microphone unit: ");
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), micLabel, 0, 1, 1, 2);
+	FPLabel = gtk_label_new("Front Panel unit: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), FPLabel, 0, 1, 1, 2);
 
-	micEntry = gtk_entry_new_with_max_length(55);
-	gtk_entry_set_text(GTK_ENTRY(micEntry), fconfig.mic);
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), micEntry, 1, 2, 1, 2);
+	FPEntry = gtk_spin_button_new_with_range(0, 10, 1);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(FPEntry), fconfig.fp);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), FPEntry, 1, 2, 1, 2);
 
 	phoneLabel = gtk_label_new("Head Phone Unit: ");
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 2, 3, 1, 2);
@@ -384,6 +399,205 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	g_signal_connect_swapped(G_OBJECT(CloseButton), "clicked", G_CALLBACK (gtk_widget_destroy), (gpointer) settings_window);
 
 	gtk_widget_show_all (settings_window);
+}
+
+static
+void MixerActivated (GObject *trayicon, gpointer window)
+{
+
+	GtkWidget *             mixer_table;
+	GtkWidget *             mixer_frame[100];
+	GtkWidget *		VolImg;
+	GtkWidget *		PcmImg;
+	const gchar *labels[4] = { 
+		"Head Phones enable", 
+		"<span size='small'>Baby bath</span>", 
+		"<span color='Blue' size='small'>Hight</span>", 
+		"<span color='Red' size='small'>Mute</span>" 
+	};
+	gdouble marks[3] = { 0, 50, 100 };
+	char	mixer[PATH_MAX];
+	char	lstr[5], rstr[5];
+	char	*name, *eptr;
+	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
+	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
+	int	frame_unit, foo, bar, baz, n;
+	struct mixerhash *mixerh;
+
+
+	mixer_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+	gtk_window_set_title (GTK_WINDOW (mixer_window), "GTMixer - Mixer");
+	gtk_container_set_border_width (GTK_CONTAINER (mixer_window), 10);
+	gtk_window_set_resizable(GTK_WINDOW (mixer_window), FALSE);
+	gtk_widget_set_size_request (mixer_window, 725, 370);
+	gtk_window_set_position (GTK_WINDOW (mixer_window),GTK_WIN_POS_CENTER);
+
+	gtk_widget_modify_bg(GTK_WIDGET(mixer_window), GTK_STATE_NORMAL, &fconfig.ncolor);
+
+	mixer_table = gtk_table_new(30, 20, FALSE);
+	gtk_table_set_row_spacings(GTK_TABLE(mixer_table), 5);
+	gtk_table_set_col_spacings(GTK_TABLE(mixer_table), 5);
+	gtk_container_add(GTK_CONTAINER(mixer_window), mixer_table);
+
+	VolImg = gtk_image_new_from_file(VOLSET);
+	PcmImg = gtk_image_new_from_file(PCMSET);
+	gtk_image_set_pixel_size(GTK_IMAGE(VolImg), 10);
+	gtk_image_set_pixel_size(GTK_IMAGE(PcmImg), 10);
+
+	// start get mixer units
+	strcpy(mixer, fconfig.device);
+
+	if ((name = strdup(basename(mixer))) == NULL)
+		err(1, "strdup()");
+	if (strncmp(name, "mixer", 5) == 0 && name[5] != '\0') {
+		n = strtol(name + 5, &eptr, 10) - 1;
+		if (n > 0 && *eptr == '\0')
+			snprintf(mixer, PATH_MAX - 1, "/dev/mixer%d", n);
+	}
+
+	free(name);
+	name = mixer;
+
+	n = 1;
+	frame_unit=0;
+
+	if (sflag && Sflag)
+		dusage = 1;
+
+	if ((baz = open(name, O_RDWR)) < 0)
+			err(1, "%s", name);
+
+	if (ioctl(baz, SOUND_MIXER_READ_DEVMASK, &devmask) == -1)
+		err(1, "SOUND_MIXER_READ_DEVMASK");
+	if (ioctl(baz, SOUND_MIXER_READ_RECMASK, &recmask) == -1)
+		err(1, "SOUND_MIXER_READ_RECMASK");
+	if (ioctl(baz, SOUND_MIXER_READ_RECSRC, &recsrc) == -1)
+		err(1, "SOUND_MIXER_READ_RECSRC");
+	orecsrc = recsrc;
+
+
+	for (foo = 0, n = 0; foo < SOUND_MIXER_NRDEVICES; foo++) {
+		if (!((1 << foo) & devmask))
+			continue;
+		if (ioctl(baz, MIXER_READ(foo),&bar) == -1) {
+			warn("MIXER_READ");
+			continue;
+		}
+		if (Sflag || sflag) {
+			printf("%s%s%c%d:%d", n ? " " : "",
+					names[foo], Sflag ? ':' : ' ',
+					bar & 0x7f, (bar >> 8) & 0x7f);
+			n++;
+		} else
+		{
+			mixer_frame[frame_unit] = gtk_frame_new(names[foo]);
+
+			// add to hash table
+			mixerh = malloc(sizeof(struct mixerhash));
+			strcpy(mixerh->name, names[foo]);
+			mixerh->id = frame_unit;
+			HASH_ADD_STR( mixerunits, name, mixerh );
+
+			gtk_frame_set_shadow_type(GTK_FRAME(mixer_frame[frame_unit]), GTK_SHADOW_ETCHED_IN);
+			if (strncmp(names[foo],"vol",sizeof("vol"))==0)
+				    gtk_table_attach_defaults(GTK_TABLE(mixer_table), VolImg, 0, 1, frame_unit, frame_unit+1);
+			if (strncmp(names[foo],"pcm",sizeof("pcm"))==0)
+				    gtk_table_attach_defaults(GTK_TABLE(mixer_table), PcmImg, 0, 1, frame_unit, frame_unit+1);
+			gtk_table_attach_defaults(GTK_TABLE(mixer_table), mixer_frame[frame_unit],1, 2, frame_unit, frame_unit+1);
+
+			GdkColor color_scal;
+			gdk_color_parse("#ECECEC", &color_scal);
+			mixer_hscale[frame_unit] = gtk_hscale_new_with_range(0, 100, 1); 
+			gtk_scale_set_digits(GTK_SCALE(mixer_hscale[frame_unit]), 0);
+			gtk_widget_modify_bg(GTK_WIDGET(mixer_hscale[frame_unit]), GTK_STATE_ACTIVE, &color_scal);
+			gtk_scale_add_mark (GTK_SCALE (mixer_hscale[frame_unit]), marks[0], GTK_POS_BOTTOM, labels[3]);
+			gtk_scale_add_mark (GTK_SCALE (mixer_hscale[frame_unit]), marks[2], GTK_POS_BOTTOM, labels[2]);
+			gtk_scale_set_value_pos(GTK_SCALE(mixer_hscale[frame_unit]), GTK_POS_LEFT);
+			gtk_range_set_update_policy (GTK_RANGE (mixer_hscale[frame_unit]),
+					GTK_UPDATE_CONTINUOUS);
+
+			gtk_scale_set_value_pos (GTK_SCALE(mixer_hscale[frame_unit]), GTK_POS_LEFT);
+
+			gtk_container_add(GTK_CONTAINER(mixer_frame[frame_unit]), mixer_hscale[frame_unit]);
+
+			frame_unit++;
+		}
+	}
+	close(baz);
+	get_mixer_state_all();
+	
+
+	gtk_widget_show_all (mixer_window);
+}
+
+static
+void get_mixer_unit ()
+{
+	char	mixer[PATH_MAX];
+	char	lstr[5], rstr[5];
+	char	*name, *eptr;
+	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
+	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
+	int	frame_unit, foo, bar, baz, n;
+	struct mixerhash *mixerh;
+
+	strcpy(mixer, fconfig.device);
+
+	if ((name = strdup(basename(mixer))) == NULL)
+		err(1, "strdup()");
+	if (strncmp(name, "mixer", 5) == 0 && name[5] != '\0') {
+		n = strtol(name + 5, &eptr, 10) - 1;
+		if (n > 0 && *eptr == '\0')
+			snprintf(mixer, PATH_MAX - 1, "/dev/mixer%d", n);
+	}
+
+	free(name);
+	name = mixer;
+
+	n = 1;
+	frame_unit=0;
+
+	if (sflag && Sflag)
+		dusage = 1;
+
+	if ((baz = open(name, O_RDWR)) < 0)
+			err(1, "%s", name);
+
+	if (ioctl(baz, SOUND_MIXER_READ_DEVMASK, &devmask) == -1)
+		err(1, "SOUND_MIXER_READ_DEVMASK");
+	if (ioctl(baz, SOUND_MIXER_READ_RECMASK, &recmask) == -1)
+		err(1, "SOUND_MIXER_READ_RECMASK");
+	if (ioctl(baz, SOUND_MIXER_READ_RECSRC, &recsrc) == -1)
+		err(1, "SOUND_MIXER_READ_RECSRC");
+	orecsrc = recsrc;
+
+
+	for (foo = 0, n = 0; foo < SOUND_MIXER_NRDEVICES; foo++) {
+		if (!((1 << foo) & devmask))
+			continue;
+		if (ioctl(baz, MIXER_READ(foo),&bar) == -1) {
+			warn("MIXER_READ");
+			continue;
+		}
+		if (Sflag || sflag) {
+			printf("%s%s%c%d:%d", n ? " " : "",
+					names[foo], Sflag ? ':' : ' ',
+					bar & 0x7f, (bar >> 8) & 0x7f);
+			n++;
+		} else
+		{
+			mixer_frame[frame_unit] = gtk_frame_new(names[foo]);
+
+			// add to hash table
+			mixerh = malloc(sizeof(struct mixerhash));
+			strcpy(mixerh->name, names[foo]);
+			mixerh->id = frame_unit;
+			HASH_ADD_STR( mixerunits, name, mixerh );
+
+			frame_unit++;
+		}
+	}
+	close(baz);
 }
 
 static 
@@ -532,10 +746,12 @@ gui_loop()
 	menu = gtk_menu_new();
 
 	menuItemView = gtk_menu_item_new_with_label ("View");
+	menuItemMix = gtk_menu_item_new_with_label ("Mixer");
 	menuItemSet = gtk_menu_item_new_with_label ("Settings");
 	Separator1 = gtk_separator_menu_item_new();
 	menuItemExit = gtk_menu_item_new_with_label ("Exit");
 	g_signal_connect (G_OBJECT (menuItemView), "activate", G_CALLBACK (trayView), window);
+	g_signal_connect (G_OBJECT (menuItemMix), "activate", G_CALLBACK (MixerActivated), window);
 	g_signal_connect (G_OBJECT (menuItemSet), "activate", GTK_SIGNAL_FUNC (SettingsActivated), window);
 	g_signal_connect (G_OBJECT (menuItemExit), "activate", G_CALLBACK (trayExit), NULL);
 
@@ -562,6 +778,7 @@ gui_loop()
 	    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
 
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemView);
+	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemMix);
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemSet);
 	gtk_menu_shell_append(GTK_MENU_SHELL (menu), Separator1);
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemExit);
@@ -677,6 +894,69 @@ get_mixer_state(char * mixprm)
 	}
 	close(baz);
 	return (0);
+}
+
+void
+get_mixer_state_all()
+{
+	char	mixer[PATH_MAX];
+	char	lstr[5], rstr[5];
+	char	*name, *eptr;
+	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
+	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
+	int	l, r, lrel, rrel, mixu;
+	int	ch, foo, bar, baz, dev, m, n, t;
+
+	strcpy(mixer, fconfig.device);
+
+	if ((name = strdup(basename(mixer))) == NULL)
+		err(1, "strdup()");
+	if (strncmp(name, "mixer", 5) == 0 && name[5] != '\0') {
+		n = strtol(name + 5, &eptr, 10) - 1;
+		if (n > 0 && *eptr == '\0')
+			snprintf(mixer, PATH_MAX - 1, "/dev/mixer%d", n);
+	}
+
+	free(name);
+	name = mixer;
+
+	n = 1;
+
+	if (sflag && Sflag)
+		dusage = 1;
+
+	if ((baz = open(name, O_RDWR)) < 0)
+			err(1, "%s", name);
+
+	if (ioctl(baz, SOUND_MIXER_READ_DEVMASK, &devmask) == -1)
+		err(1, "SOUND_MIXER_READ_DEVMASK");
+	if (ioctl(baz, SOUND_MIXER_READ_RECMASK, &recmask) == -1)
+		err(1, "SOUND_MIXER_READ_RECMASK");
+	if (ioctl(baz, SOUND_MIXER_READ_RECSRC, &recsrc) == -1)
+		err(1, "SOUND_MIXER_READ_RECSRC");
+	orecsrc = recsrc;
+
+
+	for (foo = 0, n = 0; foo < SOUND_MIXER_NRDEVICES; foo++) {
+		if (!((1 << foo) & devmask))
+			continue;
+		if (ioctl(baz, MIXER_READ(foo),&bar) == -1) {
+			warn("MIXER_READ");
+			continue;
+		}
+		if (Sflag || sflag) {
+			printf("%s%s%c%d:%d", n ? " " : "",
+					names[foo], Sflag ? ':' : ' ',
+					bar & 0x7f, (bar >> 8) & 0x7f);
+			n++;
+		} else
+		{
+			mixu = get_mixer_unit_by_name(names[foo]);
+			if (mixu != -1)
+			    gtk_range_set_value(GTK_RANGE (mixer_hscale[mixu]), bar & 0x7f);
+		}
+	}
+	close(baz);
 }
 
 int
@@ -854,6 +1134,7 @@ main(int argc, char *argv[], char *envp[])
 		fprintf(stderr, gettext("wifimgr: cannot open display\n"));
 		exit(1);
 	}
+	get_mixer_unit();
 
 	gui_loop();
 
