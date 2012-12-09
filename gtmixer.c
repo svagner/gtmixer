@@ -223,10 +223,11 @@ int save_config(gpointer set_window)
 	strcpy(fconfig.device, gtk_entry_get_text(GTK_ENTRY(devEntry)));
 	fconfig.ounit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(outEntry));
 	fconfig.punit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(phoneEntry));
+	fconfig.phonesysctl = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(phoneCb));
 	gtk_color_selection_get_current_color (GTK_COLOR_SELECTION(ColorSelect), &fconfig.ncolor);
 	bzero(fconfig.nfont, sizeof(fconfig.nfont));
 	strcpy(fconfig.nfont,gtk_font_selection_get_font_name(GTK_FONT_SELECTION(FontSelect)));
-	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nout = %d\n\n[window]\npixel = %d\nred = %d\ngreen = %d\nblue = %d\nfont = %s\n", fconfig.device, fconfig.punit, fconfig.ounit, fconfig.ncolor.pixel, fconfig.ncolor.red, fconfig.ncolor.green, fconfig.ncolor.blue, fconfig.nfont);
+	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nphoneviasysctl = %d\nout = %d\n\n[window]\npixel = %d\nred = %d\ngreen = %d\nblue = %d\nfont = %s\n", fconfig.device, fconfig.punit, fconfig.phonesysctl, fconfig.ounit, fconfig.ncolor.pixel, fconfig.ncolor.red, fconfig.ncolor.green, fconfig.ncolor.blue, fconfig.nfont);
 
 	status = fclose(conf);
 
@@ -251,6 +252,8 @@ int handler(void* user, const char* section, const char* name,
 		pconfig->device = strdup(value);
 	} else if (MATCH("mixer", "phonehead")) {
 		pconfig->phone_unit = atoi(value);
+	} else if (MATCH("mixer", "phoneviasysctl")) {
+		pconfig->phonesysctl = atoi(value);
 	} else if (MATCH("mixer", "out")) {
 		pconfig->out_unit = atoi(value);
 	} else if (MATCH("window", "pixel")) {
@@ -279,6 +282,8 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	GtkWidget *             settings_table_p3;
 	GtkWidget *             devLabel;
 	GtkWidget *             phoneLabel;
+	GtkWidget *             phoneCbLabel;
+
 	GtkWidget *             outLabel;
 	GtkWidget *             FPLabel;
 	GtkWidget *             colorLabel;
@@ -334,27 +339,36 @@ void SettingsActivated (GObject *trayicon, gpointer window)
 	devEntry = gtk_entry_new_with_max_length(55);
 	gtk_entry_set_text(GTK_ENTRY(devEntry), fconfig.device);
 	gtk_table_attach_defaults(GTK_TABLE(settings_table), devEntry, 1, 6, 0, 1);
+	
+	phoneCbLabel = gtk_label_new("Head Phone via sysctl: ");
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneCbLabel, 0, 1, 1, 2);
+	
+	phoneCb = gtk_check_button_new();
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(phoneCb), fconfig.phonesysctl);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneCb, 1, 2, 1, 2);
+
 
 	FPLabel = gtk_label_new("Front Panel unit: ");
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), FPLabel, 0, 1, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), FPLabel, 0, 1, 2, 3);
 
 	FPEntry = gtk_spin_button_new_with_range(0, 10, 1);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(FPEntry), fconfig.fp);
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), FPEntry, 1, 2, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), FPEntry, 1, 2, 2, 3);
+
 
 	phoneLabel = gtk_label_new("Head Phone Unit: ");
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 2, 3, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneLabel, 2, 3, 2, 3);
 
 	phoneEntry = gtk_spin_button_new_with_range(0, 10, 1);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(phoneEntry), fconfig.punit);
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneEntry, 3, 4, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), phoneEntry, 3, 4, 2, 3);
 
 	outLabel = gtk_label_new("Sound out Unit: ");
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), outLabel, 4, 5, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), outLabel, 4, 5, 2, 3);
 
 	outEntry = gtk_spin_button_new_with_range(0, 10, 1);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(outEntry), fconfig.ounit);
-	gtk_table_attach_defaults(GTK_TABLE(settings_table), outEntry, 5, 6, 1, 2);
+	gtk_table_attach_defaults(GTK_TABLE(settings_table), outEntry, 5, 6, 2, 3);
 
 	settings_table_p2 = gtk_table_new(7, 6, FALSE);
 	gtk_table_set_row_spacings(GTK_TABLE(settings_table), 5);
@@ -454,7 +468,7 @@ void MixerActivated (GObject *trayicon, gpointer window)
 
 	gtk_widget_modify_bg(GTK_WIDGET(mixer_window), GTK_STATE_NORMAL, &fconfig.ncolor);
 
-	mixer_table = gtk_table_new(1, 2, FALSE);
+	mixer_table = gtk_table_new(1, 4, FALSE);
 	gtk_table_set_row_spacings(GTK_TABLE(mixer_table), 1);
 	gtk_table_set_col_spacings(GTK_TABLE(mixer_table), 1);
 	gtk_container_add(GTK_CONTAINER(mixer_window), mixer_table);
@@ -474,7 +488,7 @@ void MixerActivated (GObject *trayicon, gpointer window)
 				    gtk_table_attach_defaults(GTK_TABLE(mixer_table), VolImg, 0, 1, mixerh->id, (mixerh->id)+1);
 			if (strncmp(mixerh->name,"pcm",sizeof("pcm"))==0)
 				    gtk_table_attach_defaults(GTK_TABLE(mixer_table), PcmImg, 0, 1, mixerh->id, (mixerh->id)+1);
-			gtk_table_attach_defaults(GTK_TABLE(mixer_table), mixer_frame[mixerh->id],1, 2, mixerh->id, (mixerh->id)+1);
+			gtk_table_attach_defaults(GTK_TABLE(mixer_table), mixer_frame[mixerh->id],1, 4, mixerh->id, (mixerh->id)+1);
 
 			GdkColor color_scal;
 			gdk_color_parse("#ECECEC", &color_scal);
@@ -603,16 +617,17 @@ void trayIconActivated(GObject *trayicon,  gpointer window)
 	    printf("Is tray = FALSE\n");
 #endif
 	}
-	
-	if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, NULL, 0) < 0)
-		printf("%d\n", errno);
-	if (sndunit==1)
+	if (fconfig.phonesysctl==1)
 	{
-	    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
+		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, NULL, 0) < 0)
+			printf("%d\n", errno);
+		if (sndunit==1)
+		{
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
+		}
+		else
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
 	}
-	else
-	    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
-
 #if DEBUG==1
 	printf("Unit: %d\n", sndunit);
 	printf("Activated!\n");
@@ -677,22 +692,32 @@ gui_loop()
 	frame2 = gtk_frame_new("Master");
 	gtk_frame_set_shadow_type(GTK_FRAME(frame2), GTK_SHADOW_ETCHED_IN);
 
-	checkphone = gtk_check_button_new_with_label(labels[0]);
+
 
 
 	VolImg = gtk_image_new_from_file(VOLSET);
 	PcmImg = gtk_image_new_from_file(PCMSET);
-	PhoneImg = gtk_image_new_from_file(PHONESET);
+
 	gtk_image_set_pixel_size(GTK_IMAGE(VolImg), 10);
 	gtk_image_set_pixel_size(GTK_IMAGE(PcmImg), 10);
-	gtk_image_set_pixel_size(GTK_IMAGE(PhoneImg), 10);
+
 
 	gtk_table_attach_defaults(GTK_TABLE(table), VolImg, 0, 1, 0, 1);
 	gtk_table_attach_defaults(GTK_TABLE(table), PcmImg, 0, 1, 1, 2);
+
+	gtk_table_attach_defaults(GTK_TABLE(table), frame,1, 4, 0, 1);
+	gtk_table_attach_defaults(GTK_TABLE(table), frame2, 1, 4, 1, 2);
+	if (fconfig.phonesysctl==1)
+	{
+	    checkphone = gtk_check_button_new_with_label(labels[0]);
+	    PhoneImg = gtk_image_new_from_file(PHONESET);
+	    gtk_image_set_pixel_size(GTK_IMAGE(PhoneImg), 10);
 	gtk_table_attach_defaults(GTK_TABLE(table), PhoneImg, 0, 1, 2, 3);
-	gtk_table_attach_defaults(GTK_TABLE(table), frame,1, 2, 0, 1);
-	gtk_table_attach_defaults(GTK_TABLE(table), frame2, 1, 2, 1, 2);
 	gtk_table_attach_defaults(GTK_TABLE(table), checkphone, 1, 2, 2, 3);
+	}
+	else
+	    gtk_widget_set_size_request (window, 280, 150);
+
 
 
 	GdkColor color_scal;
@@ -740,8 +765,7 @@ gui_loop()
 	g_signal_connect(GTK_STATUS_ICON (trayIcon), "activate", GTK_SIGNAL_FUNC (trayIconActivated), window);
 	g_signal_connect(GTK_STATUS_ICON (trayIcon), "popup-menu", GTK_SIGNAL_FUNC (trayIconPopup), menu);
 
-	g_signal_connect(G_OBJECT(checkphone), "clicked",
-			        G_CALLBACK(checkphone_toogle_signal), (gpointer) checkphone);
+
 	g_signal_connect (G_OBJECT (hscalePcm), "value_changed",
 			                      G_CALLBACK (cb_digits_scale_pcm), NULL);
 	g_signal_connect (G_OBJECT (hscaleVol), "value_changed",
@@ -750,15 +774,19 @@ gui_loop()
 
 	g_signal_connect (table, "focus-out-event", G_CALLBACK (on_focus_out), NULL);
 	
-	if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, NULL, 0) < 0)
-		printf("%d\n", errno);
-	if (sndunit==1)
+	if (fconfig.phonesysctl==1)
 	{
-	    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
+		g_signal_connect(G_OBJECT(checkphone), "clicked",
+				G_CALLBACK(checkphone_toogle_signal), (gpointer) checkphone);
+		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, NULL, 0) < 0)
+			printf("%d\n", errno);
+		if (sndunit==1)
+		{
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
+		}
+		else
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
 	}
-	else
-	    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
-
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemView);
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemMix);
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemSet);
@@ -953,7 +981,7 @@ set_mixer_state(char * mixprm, int st)
 	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
 	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
 	int	l, r, lrel, rrel;
-	int	ch, foo, bar, baz, dev, m, n, t;
+	int	bar, baz, dev, m, n, t;
 
 	strcpy(mixer, fconfig.device);
 
@@ -1054,12 +1082,8 @@ main(int argc, char *argv[], char *envp[])
 {
 	char	mixer[PATH_MAX];
 	char	fconfdir[PATH_MAX];
-	char	lstr[5], rstr[5];
 	char	*name, *eptr;
-	int	devmask = 0, recmask = 0, recsrc = 0, orecsrc;
-	int	dusage = 0, drecsrc = 0, sflag = 0, Sflag = 0;
-	int	l, r, lrel, rrel;
-	int	ch, foo, bar, baz, dev, m, n, t;
+	int	n;
 	configuration config;
 	configuration * pconfig = &config;
 	FILE *conf;
@@ -1072,6 +1096,7 @@ main(int argc, char *argv[], char *envp[])
 	config.font = device;
 	config.phone_unit=0;
 	config.out_unit=0;
+	fconfig.phonesysctl=0;
 	fconfig.ncolor.pixel=0;
 	fconfig.ncolor.red=65535;
 	fconfig.ncolor.green=65535;
@@ -1102,6 +1127,7 @@ main(int argc, char *argv[], char *envp[])
 	strcpy(fconfig.nfont, config.font);
 	fconfig.punit = config.phone_unit;
 	fconfig.ounit = config.out_unit;
+	fconfig.phonesysctl = config.phonesysctl;
 
 	strcpy(mixer, fconfig.device);
 

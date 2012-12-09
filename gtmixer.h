@@ -17,6 +17,8 @@ typedef struct
 	GdkColor wincolor;
 	int phone_unit;
 	int out_unit;
+	int fp;
+	int phonesysctl;
 } configuration;
 
 struct 
@@ -28,6 +30,7 @@ struct
 	int ounit;
 	GdkColor ncolor;
 	gchar nfont[100];
+	int phonesysctl;
 } fconfig;
 
 struct mixerhash {
@@ -51,6 +54,7 @@ GtkWidget *             mixer_hscale[MAXMIXUNIT];
 GtkWidget*		devEntry;
 GtkWidget*		FPEntry;
 GtkWidget*		phoneEntry;
+GtkWidget *             phoneCb;
 GtkWidget*		outEntry;
 GtkWidget *		ColorSelect;
 GtkWidget *		FontSelect;
