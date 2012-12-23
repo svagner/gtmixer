@@ -188,7 +188,7 @@ void on_focus_out (GtkWidget* window)
 	is_tray=FALSE;
 }
 
-void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
+void checkphone_toogle_signal(GtkWidget *widget, gpointer checkphone_toogle)
 {
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkphone)))
 	{
@@ -196,8 +196,17 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 		g_print("Mic Enable!\n");
 #endif
 		sndunitnw=1;
-		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.punit, sizeof(sndunitnw)) < 0)
+		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.punit, sizeof(sndunitnw)) < 0) {
 			perror("Sysctl hw.snd.default_unit");
+			dialog = gtk_message_dialog_new (GTK_WINDOW(window),
+				GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR,
+				GTK_BUTTONS_CLOSE,
+				"Sysctl hw.snd.default_unit: %s",
+				g_strerror (errno));
+			gtk_dialog_run (GTK_DIALOG (dialog));
+			gtk_widget_destroy (dialog);
+		}
 	}
 	else
 	{
@@ -205,8 +214,17 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer window)
 		g_print("Mic Disable!\n");
 #endif
 		sndunitnw=0;
-		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.ounit, sizeof(&sndunitnw)) < 0)
+		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.ounit, sizeof(&sndunitnw)) < 0) {
 			perror("Sysctl hw.snd.default_unit");
+			dialog = gtk_message_dialog_new (GTK_WINDOW(window),
+				GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR,
+				GTK_BUTTONS_CLOSE,
+				"Sysctl hw.snd.default_unit: %s",
+				g_strerror (errno));
+			gtk_dialog_run (GTK_DIALOG (dialog));
+			gtk_widget_destroy (dialog);
+		}
 	}
 }
 
@@ -234,8 +252,18 @@ int save_config(gpointer set_window)
 	gtk_widget_modify_bg(GTK_WIDGET(settings_window), GTK_STATE_NORMAL, &fconfig.ncolor);
 	gtk_widget_modify_bg(GTK_WIDGET(window), GTK_STATE_NORMAL, &fconfig.ncolor);
 	set_app_font(fconfig.nfont);
-	if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.ounit, sizeof(&sndunitnw)) < 0)
+	if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.ounit, sizeof(&sndunitnw)) < 0) {
 		perror("Sysctl hw.snd.default_unit");
+		dialog = gtk_message_dialog_new (GTK_WINDOW(settings_window),
+				GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR,
+				GTK_BUTTONS_CLOSE,
+				"Sysctl hw.snd.default_unit: %s",
+				g_strerror (errno));
+
+		gtk_dialog_run (GTK_DIALOG (dialog));
+		gtk_widget_destroy (dialog);
+	}
 	return status;
 }
 
@@ -620,7 +648,17 @@ void trayIconActivated(GObject *trayicon,  gpointer window)
 	if (fconfig.phonesysctl==1)
 	{
 		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, NULL, 0) < 0)
-			printf("%d\n", errno);
+		{
+			dialog = gtk_message_dialog_new (GTK_WINDOW(window),
+				GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR,
+				GTK_BUTTONS_CLOSE,
+				"Sysctl hw.snd.default_unit: %s",
+				g_strerror (errno));
+
+			gtk_dialog_run (GTK_DIALOG (dialog));
+			gtk_widget_destroy (dialog);
+		}
 		if (sndunit==1)
 		{
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
