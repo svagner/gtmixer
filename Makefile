@@ -1,6 +1,3 @@
-# $FreeBSD: gtmixer/Makefile 
-
-
 .include <bsd.own.mk>
 
 PROG=	gtmixer

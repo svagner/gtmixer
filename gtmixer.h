@@ -61,6 +61,7 @@ GtkWidget *		FontSelect;
 GtkWidget *		settings_window;
 GtkWidget *		mixer_window;
 GtkWidget *             window;
+GtkWidget *             dialog;
 GtkStatusIcon *		trayIcon;
 
 
