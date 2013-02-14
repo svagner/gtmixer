@@ -2,7 +2,7 @@
 
 PROG=	gtmixer
 MAN=	gtmixer.1
-SRCS=	gtmixer.c ini.c ini.h
+SRCS=	device_func.c gtmixer.c ini.c ini.h
 
 GTK_CFLAGS !=   pkg-config --cflags gtk+-2.0
 GTK_LDFLAGS !=  pkg-config --libs gtk+-2.0
