@@ -14,10 +14,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <sys/sysctl.h>
-
-#include <unistd.h>
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -26,7 +25,7 @@
 
 static gint	is_tray=FALSE;
 static size_t   len = sizeof(sndunit);
-static int	mixer_desc=0;
+static int	mixer_desc=0, onlyget_sysctl=FALSE;
 static int      vol_ischanged=FALSE, pcm_ischanged=FALSE;
 extern struct	mixerhash *mixerunits;
 
@@ -139,6 +138,8 @@ void on_focus_out (GtkWidget* window)
 
 void checkphone_toogle_signal(GtkWidget *widget, gpointer checkphone_toogle)
 {
+	if(onlyget_sysctl)
+		return;
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkphone)))
 	{
 		sndunitnw=1;
@@ -146,11 +147,11 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer checkphone_toogle)
 		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.punit, sizeof(sndunitnw)) < 0) {
 			perror("Sysctl hw.snd.default_unit");
 			dialog = gtk_message_dialog_new (GTK_WINDOW(window),
-				GTK_DIALOG_DESTROY_WITH_PARENT,
-				GTK_MESSAGE_ERROR,
-				GTK_BUTTONS_CLOSE,
-				"Sysctl hw.snd.default_unit: %s",
-				g_strerror (errno));
+					GTK_DIALOG_DESTROY_WITH_PARENT,
+					GTK_MESSAGE_ERROR,
+					GTK_BUTTONS_CLOSE,
+					"Sysctl hw.snd.default_unit: %s",
+					g_strerror (errno));
 			gtk_dialog_run (GTK_DIALOG (dialog));
 			gtk_widget_destroy (dialog);
 		}
@@ -162,14 +163,13 @@ void checkphone_toogle_signal(GtkWidget *widget, gpointer checkphone_toogle)
 		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, &fconfig.ounit, sizeof(&sndunitnw)) < 0) {
 			perror("Sysctl hw.snd.default_unit");
 			dialog = gtk_message_dialog_new (GTK_WINDOW(window),
-				GTK_DIALOG_DESTROY_WITH_PARENT,
-				GTK_MESSAGE_ERROR,
-				GTK_BUTTONS_CLOSE,
-				"Sysctl hw.snd.default_unit: %s",
-				g_strerror (errno));
+					GTK_DIALOG_DESTROY_WITH_PARENT,
+					GTK_MESSAGE_ERROR,
+					GTK_BUTTONS_CLOSE,
+					"Sysctl hw.snd.default_unit: %s",
+					g_strerror (errno));
 			gtk_dialog_run (GTK_DIALOG (dialog));
 			gtk_widget_destroy (dialog);
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
 		}
 	}
 }
@@ -483,12 +483,18 @@ void trayIconActivated(GObject *trayicon,  gpointer window)
 			gtk_dialog_run (GTK_DIALOG (dialog));
 			gtk_widget_destroy (dialog);
 		}
-		if (sndunitnw==1)
+		if (sndunit==fconfig.punit)
 		{
+			onlyget_sysctl=TRUE;
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
+			onlyget_sysctl=FALSE;	
 		}
 		else
+		{
+			onlyget_sysctl=TRUE;
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
+			onlyget_sysctl=FALSE;	
+		}
 	}
 	DPRINT("Unit: %d activated\n", sndunit);
 	g_signal_connect (window, "focus-out-event", G_CALLBACK (on_focus_out), NULL);
@@ -635,16 +641,16 @@ gui_loop()
 	
 	if (fconfig.phonesysctl==1)
 	{
-		g_signal_connect(G_OBJECT(checkphone), "clicked",
-				G_CALLBACK(checkphone_toogle_signal), (gpointer) checkphone);
 		if (sysctlbyname("hw.snd.default_unit", &sndunit, &len, NULL, 0) < 0)
 			printf("%d\n", errno);
-//		if (sndunitnw==1)
-//		{
-//			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
-//		}
-//		else
+		if (sndunit==fconfig.punit)
+		{
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
+		}
+		else
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 0);
+		g_signal_connect(G_OBJECT(checkphone), "clicked",
+				G_CALLBACK(checkphone_toogle_signal), (gpointer) checkphone);
 	}
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemView);
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), menuItemMix);
