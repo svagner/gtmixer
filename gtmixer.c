@@ -44,15 +44,11 @@
 GtkBuilder *builder;
 GtkWidget *app;
 
-static pthread_mutex_t mixer_mutex;
-
 const char	*names[SOUND_MIXER_NRDEVICES] = SOUND_DEVICE_NAMES;
 
 static void	usage(int devmask, int recmask);
 static int	res_name(const char *name, int mask);
 static void	print_recsrc(int recsrc, int recmask, int sflag);
-
-pthread_t tid[2];
 
 int
 gui_init(int * ac, char *** av) {
@@ -92,11 +88,8 @@ cb_digits_scale_pcm(GtkWidget *widget, gpointer window)
 #if DEBUG==1	
 	printf("==> New PCM state is %d\n", pcmstate);
 #endif
-	    pthread_mutex_lock(&mixer_mutex);
 	set_mixer_state("pcm", pcmstate);
-	    pthread_mutex_unlock(&mixer_mutex);
-
-	    pcm_ischanged=TRUE;
+	pcm_ischanged=TRUE;
 }
 
 void
@@ -121,9 +114,7 @@ cb_digits_scale_vol(GtkWidget *widget, gpointer window)
 #if DEBUG==1
 	printf("==> New PCM state is %d\n", volstate);
 #endif
-	pthread_mutex_lock(&mixer_mutex);
 	set_mixer_state("vol", volstate);
-	pthread_mutex_unlock(&mixer_mutex);
 	vol_ischanged=TRUE;
 }
 
@@ -659,7 +650,7 @@ void trayIconActivated(GObject *trayicon,  gpointer window)
 			gtk_dialog_run (GTK_DIALOG (dialog));
 			gtk_widget_destroy (dialog);
 		}
-		if (sndunit==1)
+		if (sndunitnw==1)
 		{
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkphone), 1);
 		}
