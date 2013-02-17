@@ -684,6 +684,8 @@ main(int argc, char *argv[], char *envp[])
 	config.font = device;
 	config.phone_unit=0;
 	config.out_unit=0;
+	fconfig.punit=0;
+	fconfig.ounit=0;
 	fconfig.phonesysctl=0;
 	fconfig.ncolor.pixel=0;
 	fconfig.ncolor.red=65535;
@@ -696,12 +698,12 @@ main(int argc, char *argv[], char *envp[])
 	}
 
 	// check variables
-	if (strlen(pconfig->device)==0)
+	if (strlen(config.device)==0)
 	{
 		DPRINT("not fount device in config - using %s device\n", DEFAULTDEV);
 		strcpy(device, DEFAULTDEV);
 	}
-	if (strlen(pconfig->font)==0)
+	if (strlen(config.font)==0)
 	{
 		printf("not fountd font in config - using %s font\n", DEFAULTFONT);
 		strcpy(font, DEFAULTFONT);

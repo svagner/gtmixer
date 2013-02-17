@@ -10,7 +10,7 @@ GTK_LDFLAGS !=  pkg-config --libs gtk+-2.0
 INI_CFLAGS +=	-DINI_ALLOW_MULTILINE=0 -DINI_ALLOW_BOM=0 -DINI_USE_STACK=0 -DINI_MAX_LINE=1000
 
 .if defined(WITHOUT_NLS)
-CFLAGS +=       -DWITHOUT_NLS 
+CFLAGS +=       -DWITHOUT_NLS
 .else
 LDFLAGS +=      -L${PREFIX}/lib -lintl
 .endif

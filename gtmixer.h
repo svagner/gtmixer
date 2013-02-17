@@ -13,7 +13,9 @@
 
 #include <libgen.h>
 
-#define DEBUG	1
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
 #define gettext(x)      (x)
 #define MATCH(s, n)	strcmp(section, s) == 0 && strcmp(name, n) == 0
@@ -54,20 +56,20 @@ typedef struct
 
 struct 
 {
-	char directory[255];
-	char device[55];
-	int fp;
-	int punit;
-	int ounit;
-	GdkColor ncolor;
-	gchar nfont[100];
-	int phonesysctl;
-} fconfig;
+	char directory[255];	/* store the config path		*/
+	char device[55];	/* device for output sound (/dev/mixer)	*/
+	int fp;			/* front panel unit output		*/
+	int punit;		/* phonehead unit output		*/
+	int ounit;		/* primary sound output unit		*/
+	GdkColor ncolor;	/* declare colour for form		*/
+	gchar nfont[100];	/* declare font for form		*/
+	int phonesysctl;	/* switch to head phone via sysctl(8)	*/
+} fconfig;			/* global config struct			*/
 
 struct mixerhash {
-	char name[30];     /* we'll use this field as the key */        
+	char name[30];		/* mixer value (vol, pcm, etc.) as the key  */        
 	int id;            
-	UT_hash_handle hh; /* makes this structure hashable */
+	UT_hash_handle hh;	/* makes this structure hashable	    */
 };
 
 GtkWidget*		checkphone;
