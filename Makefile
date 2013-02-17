@@ -15,6 +15,10 @@ CFLAGS +=       -DWITHOUT_NLS
 LDFLAGS +=      -L${PREFIX}/lib -lintl
 .endif
 
+.if defined(DEBUG)
+INI_CFLAGS +=	-DDEBUG=1
+.endif
+
 CFLAGS +=       ${GTK_CFLAGS} ${INI_CFLAGS}
 LDFLAGS +=      ${GTK_LDFLAGS}
 
