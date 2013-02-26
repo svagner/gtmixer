@@ -381,12 +381,6 @@ void MixerActivated (GObject *trayicon, gpointer window)
 	GtkWidget *             mixer_frame[100];
 	GtkWidget *		VolImg;
 	GtkWidget *		PcmImg;
-	const gchar *labels[4] = { 
-		"Head Phones enable", 
-		"<span size='small'>Baby bath</span>", 
-		"<span color='Blue' size='small'>Hight</span>", 
-		"<span color='Red' size='small'>Mute</span>" 
-	};
 	gdouble marks[3] = { 0, 50, 100 };
 	struct mixerhash *mixerh;
 	int tablesize;
@@ -415,9 +409,7 @@ void MixerActivated (GObject *trayicon, gpointer window)
 	gtk_image_set_pixel_size(GTK_IMAGE(PcmImg), 5);
 
 	for (mixerh=mixerunits; mixerh != NULL; mixerh=(struct mixerhash*)mixerh->hh.next) {
-#if DEBUG==1
-			printf("%s - %d\n", mixerh->name, mixerh->id);
-#endif
+			DPRINT("mixer name:%s mixer id: %d\n", mixerh->name, mixerh->id);
 			mixer_frame[mixerh->id] = gtk_frame_new(mixerh->name);
 			gtk_frame_set_shadow_type(GTK_FRAME(mixer_frame[mixerh->id]), GTK_SHADOW_ETCHED_IN);
 			if (strncmp(mixerh->name,"vol",sizeof("vol"))==0)
@@ -521,12 +513,6 @@ gui_loop()
 	GtkWidget *		PhoneImg;
 
 	gint			xOrigin,yOrigin;
-	const gchar *labels[4] = { 
-		"Head Phones enable", 
-		"<span size='small'>Baby bath</span>", 
-		"<span color='Blue' size='small'>Hight</span>", 
-		"<span color='Red' size='small'>Mute</span>" 
-	};
 	gdouble marks[3] = { 0, 50, 100 };
 
 	window = gtk_window_new( GTK_WINDOW_TOPLEVEL );

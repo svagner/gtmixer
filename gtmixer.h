@@ -97,6 +97,13 @@ GtkStatusIcon*		trayIcon;
 GtkBuilder*		builder;
 GtkWidget*		app;
 
+const gchar *labels[4] = {
+	"Head Phones enable",
+	"<span size='small'>Baby bath</span>",
+	"<span color='Blue' size='small'>Max</span>",
+	"<span color='Red' size='small'>Mute</span>"
+};
+
 
 void usage(int devmask, int recmask);
 int  gui_init();
