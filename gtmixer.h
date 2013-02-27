@@ -97,7 +97,7 @@ GtkStatusIcon*		trayIcon;
 GtkBuilder*		builder;
 GtkWidget*		app;
 
-const gchar *labels[4] = {
+static gchar *labels[4] = {
 	"Head Phones enable",
 	"<span size='small'>Baby bath</span>",
 	"<span color='Blue' size='small'>Max</span>",
