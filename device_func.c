@@ -23,7 +23,7 @@ get_mixer_unit_by_name(const char *mixname)
 	return -1;
 }
 
-int 
+/*int 
 handler(void* user, const char* section, const char* name, const char* value)
 {
 	configuration* pconfig = (configuration*)user;
@@ -49,11 +49,11 @@ handler(void* user, const char* section, const char* name, const char* value)
 	} else if (MATCH("window", "font")) {
 		pconfig->font = strdup(value);
 	} else {
-		return 0;  /* unknown section/name, error */
-	}
+		return 0;*/  /* unknown section/name, error */
+/*	}
 
 	return 1;
-}
+}*/
 
 void
 clear_mixer_hash ()

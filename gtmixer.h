@@ -13,14 +13,22 @@
 
 #include <libgen.h>
 
+#include "dtrace.h"
+
 #ifndef DEBUG
 #define DEBUG 0
 #endif
 
+#ifndef	GIT_VERSION	
+#define GIT_VERSION	"0"
+#endif
+
+#define VER		"1.0.2"
+
 #define gettext(x)      (x)
 #define MATCH(s, n)	strcmp(section, s) == 0 && strcmp(name, n) == 0
 
-#define DPRINT(fmt, ...) do { if (DEBUG) fprintf(stderr, "[DEBUG] [%s:%d] %s(): " fmt, __FILE__, \
+#define DPRINT(fmt, ...) do { if (DEBUG || debug) fprintf(stderr, "[DEBUG] [%s:%d] %s(): " fmt, __FILE__, \
 					    __LINE__, __func__, __VA_ARGS__); } while (0)
 
 #define MAXMIXUNIT 	100
@@ -36,40 +44,32 @@
 #define PCMSET		"/usr/local/share/gtmixer/icons/tray/431.png"
 #define PHONESET	"/usr/local/share/gtmixer/icons/tray/430.png"
 
+#define MAXDEVLEN	100
+#define MAXFONTLEN	100
+#define MAXDIRNAME	255
+#define MAXMIXERKEY	30
+
 
 int		sndunit, sndunitnw, volstate, pcmstate;
-char		device[100];
-char		font[100];
 int		mixstate[MAXMIXUNIT];
-
-typedef struct
-{
-	const char* version;
-	const char* device;
-	const char* font;
-	GdkColor wincolor;
-	int phone_unit;
-	int out_unit;
-	int fp;
-	int phonesysctl;
-} configuration;
+unsigned short	debug;
 
 struct 
 {
-	char directory[255];	/* store the config path		*/
-	char device[55];	/* device for output sound (/dev/mixer)	*/
-	int fp;			/* front panel unit output		*/
-	int punit;		/* phonehead unit output		*/
-	int ounit;		/* primary sound output unit		*/
-	GdkColor ncolor;	/* declare colour for form		*/
-	gchar nfont[100];	/* declare font for form		*/
-	int phonesysctl;	/* switch to head phone via sysctl(8)	*/
-} fconfig;			/* global config struct			*/
+	char directory[MAXDIRNAME]; /* store the config path			*/
+	char device[MAXDEVLEN];	    /* device for output sound (/dev/mixer)	*/
+	int fp;			    /* front panel unit output			*/
+	int punit;		    /* phonehead unit output			*/
+	int ounit;		    /* primary sound output unit		*/
+	GdkColor ncolor;	    /* declare colour for form			*/
+	gchar nfont[MAXFONTLEN];    /* declare font for form			*/
+	int phonesysctl;	    /* switch to head phone via sysctl(8)	*/
+} fconfig;			    /* global config struct			*/
 
 struct mixerhash {
-	char name[30];		/* mixer value (vol, pcm, etc.) as the key  */        
+	char name[MAXMIXERKEY];	    /* mixer value (vol, pcm, etc.) as the key  */        
 	int id;            
-	UT_hash_handle hh;	/* makes this structure hashable	    */
+	UT_hash_handle hh;	    /* makes this structure hashable		*/
 };
 
 GtkWidget*		checkphone;
@@ -97,11 +97,12 @@ GtkStatusIcon*		trayIcon;
 GtkBuilder*		builder;
 GtkWidget*		app;
 
-static gchar *labels[4] = {
+static gchar *labels[5] = {
 	"Head Phones enable",
 	"<span size='small'>Baby bath</span>",
 	"<span color='Blue' size='small'>Max</span>",
-	"<span color='Red' size='small'>Mute</span>"
+	"<span color='Red' size='small'>Silence</span>",
+	"<span color='Green' size='small'>Base</span>"
 };
 
 
@@ -109,6 +110,7 @@ void usage(int devmask, int recmask);
 int  gui_init();
 
 void gui_loop();
+void print_version(char *myname);
 void set_app_font (const char *fontname);
 int get_mixer_state(char * mixprm);
 void get_mixer_state_all ();

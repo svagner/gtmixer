@@ -22,12 +22,20 @@
 #include <sys/lock.h>
 
 #include "gtmixer.h"
+#include "config.h"
 
 static gint	is_tray=FALSE;
 static size_t   len = sizeof(sndunit);
 static int	mixer_desc=0, onlyget_sysctl=FALSE;
 static int      vol_ischanged=FALSE, pcm_ischanged=FALSE;
 extern struct	mixerhash *mixerunits;
+
+void
+print_version(char *myname)
+{
+	fprintf(stderr, "[INFO] [%s:%d] %s(): %s-%s tag:%s\n", __FILE__, __LINE__, __func__, myname, VER, GIT_VERSION);
+	exit(0);
+}
 
 int
 gui_init(int * ac, char *** av) {
@@ -180,17 +188,16 @@ int save_config(gpointer set_window)
 	FILE *conf;
 	int status;
 
-
 	conf = fopen(fconfig.directory, "wb");
 
-	bzero(fconfig.device, sizeof(fconfig.device));
-	strcpy(fconfig.device, gtk_entry_get_text(GTK_ENTRY(devEntry)));
+	bzero(fconfig.device, strlen(fconfig.device));
+	strcpy(fconfig.device,gtk_entry_get_text(GTK_ENTRY(devEntry)));
 	fconfig.ounit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(outEntry));
 	fconfig.punit = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(phoneEntry));
 	fconfig.phonesysctl = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(phoneCb));
 	gtk_color_selection_get_current_color (GTK_COLOR_SELECTION(ColorSelect), &fconfig.ncolor);
-	bzero(fconfig.nfont, sizeof(fconfig.nfont));
-	strcpy(fconfig.nfont,gtk_font_selection_get_font_name(GTK_FONT_SELECTION(FontSelect)));
+	bzero(fconfig.nfont, strlen(fconfig.nfont));
+	strcpy(fconfig.nfont, gtk_font_selection_get_font_name(GTK_FONT_SELECTION(FontSelect)));
 	fprintf(conf,"[general]\ndevice = %s\n\n[mixer]\nphonehead = %d\nphoneviasysctl = %d\nout = %d\n\n[window]\npixel = %d\nred = %d\ngreen = %d\nblue = %d\nfont = %s\n", fconfig.device, fconfig.punit, fconfig.phonesysctl, fconfig.ounit, fconfig.ncolor.pixel, fconfig.ncolor.red, fconfig.ncolor.green, fconfig.ncolor.blue, fconfig.nfont);
 
 	status = fclose(conf);
@@ -381,7 +388,7 @@ void MixerActivated (GObject *trayicon, gpointer window)
 	GtkWidget *             mixer_frame[100];
 	GtkWidget *		VolImg;
 	GtkWidget *		PcmImg;
-	gdouble marks[3] = { 0, 50, 100 };
+	gdouble marks[3] = { 0, 75, 100 };
 	struct mixerhash *mixerh;
 	int tablesize;
 	tablesize = 0;
@@ -424,6 +431,7 @@ void MixerActivated (GObject *trayicon, gpointer window)
 			gtk_scale_set_digits(GTK_SCALE(mixer_hscale[mixerh->id]), 0);
 			gtk_widget_modify_bg(GTK_WIDGET(mixer_hscale[mixerh->id]), GTK_STATE_ACTIVE, &color_scal);
 			gtk_scale_add_mark (GTK_SCALE (mixer_hscale[mixerh->id]), marks[0], GTK_POS_BOTTOM, labels[3]);
+			gtk_scale_add_mark (GTK_SCALE (mixer_hscale[mixerh->id]), marks[1], GTK_POS_BOTTOM, labels[4]);
 			gtk_scale_add_mark (GTK_SCALE (mixer_hscale[mixerh->id]), marks[2], GTK_POS_BOTTOM, labels[2]);
 			gtk_scale_set_value_pos(GTK_SCALE(mixer_hscale[mixerh->id]), GTK_POS_LEFT);
 			gtk_range_set_update_policy (GTK_RANGE (mixer_hscale[mixerh->id]),
@@ -513,7 +521,7 @@ gui_loop()
 	GtkWidget *		PhoneImg;
 
 	gint			xOrigin,yOrigin;
-	gdouble marks[3] = { 0, 50, 100 };
+	gdouble marks[3] = { 0, 75, 100 };
 
 	window = gtk_window_new( GTK_WINDOW_TOPLEVEL );
 	g_signal_connect (window, "focus-out-event", G_CALLBACK (on_focus_out), NULL);
@@ -578,6 +586,7 @@ gui_loop()
 	gtk_scale_set_digits(GTK_SCALE(hscaleVol), 0);
 	gtk_widget_modify_bg(GTK_WIDGET(hscaleVol), GTK_STATE_ACTIVE, &color_scal);
 	gtk_scale_add_mark (GTK_SCALE (hscaleVol), marks[0], GTK_POS_BOTTOM, labels[3]);
+	gtk_scale_add_mark (GTK_SCALE (hscaleVol), marks[1], GTK_POS_BOTTOM, labels[4]);
 	gtk_scale_add_mark (GTK_SCALE (hscaleVol), marks[2], GTK_POS_BOTTOM, labels[2]);
 	gtk_scale_set_value_pos(GTK_SCALE(hscaleVol), GTK_POS_LEFT);
 	gtk_range_set_update_policy (GTK_RANGE (hscaleVol),
@@ -587,6 +596,7 @@ gui_loop()
 	gtk_scale_set_digits(GTK_SCALE(hscalePcm), 0);
 	gtk_widget_modify_bg(GTK_WIDGET(hscalePcm), GTK_STATE_ACTIVE, &color_scal);
 	gtk_scale_add_mark (GTK_SCALE (hscalePcm), marks[0], GTK_POS_BOTTOM, labels[3]);
+	gtk_scale_add_mark (GTK_SCALE (hscalePcm), marks[1], GTK_POS_BOTTOM, labels[4]);
 	gtk_scale_add_mark (GTK_SCALE (hscalePcm), marks[2], GTK_POS_BOTTOM, labels[2]);
 	gtk_range_set_update_policy (GTK_RANGE (hscalePcm),
 			                                 GTK_UPDATE_CONTINUOUS);
@@ -658,47 +668,66 @@ main(int argc, char *argv[], char *envp[])
 	char	fconfdir[PATH_MAX];
 	char	*name, *eptr;
 	int	n;
-	configuration config;
-	configuration * pconfig = &config;
 	FILE *conf;
+	int	ch, fd;
+
+	while ((ch = getopt(argc, argv, "vd")) != -1) {
+		switch (ch) {
+			case 'd':
+				debug = 1;
+				break;
+			case 'v':
+				print_version(argv[0]);
+				break;
+			case '?':
+			default:
+				break;	
+		}
+	}
+	argc -= optind;
+	argv += optind;
 
 	strcpy(fconfdir,getenv("HOME"));
 	strcat(fconfdir,CONFIGFILE);
 	strcpy(fconfig.directory,fconfdir);
 
-	config.device = device;
-	config.font = device;
-	config.phone_unit=0;
-	config.out_unit=0;
+	if(parseconfig(fconfdir))
+		DPRINT("Config file %s is not valid\n", fconfdir);
+
 	fconfig.punit=0;
 	fconfig.ounit=0;
 	fconfig.phonesysctl=0;
-	fconfig.ncolor.pixel=0;
-	fconfig.ncolor.red=65535;
-	fconfig.ncolor.green=65535;
-	fconfig.ncolor.blue=65535;
 
-	if (ini_parse(fconfig.directory, handler, &config) < 0) {
-		conf = fopen(fconfig.directory, "wb");
-		fclose(conf);
-	}
-
+	// init config
+	bzero(fconfig.device, MAXDEVLEN);
+	bzero(fconfig.nfont, MAXFONTLEN);
 	// check variables
-	if (strlen(config.device)==0)
+	if (!get_variable("[general]", "device"))
 	{
 		DPRINT("not fount device in config - using %s device\n", DEFAULTDEV);
-		strcpy(device, DEFAULTDEV);
+		//strcpy(device, DEFAULTDEV);
+		strcpy(fconfig.device, DEFAULTDEV);
 	}
-	if (strlen(config.font)==0)
+	else
+		strcpy(fconfig.device, get_variable("[general]", "device"));
+	if (!get_variable("[window]", "font"))
 	{
 		printf("not fountd font in config - using %s font\n", DEFAULTFONT);
-		strcpy(font, DEFAULTFONT);
+		//strcpy(font, DEFAULTFONT);
+		strcpy(fconfig.nfont, DEFAULTFONT);
 	}
-	strcpy(fconfig.device, config.device);
-	strcpy(fconfig.nfont, config.font);
-	fconfig.punit = config.phone_unit;
-	fconfig.ounit = config.out_unit;
-	fconfig.phonesysctl = config.phonesysctl;
+	else
+		strcpy(fconfig.nfont, get_variable("[window]", "font"));
+
+	fconfig.ncolor.pixel = get_variable("[window]", "pixel")?atoi(get_variable("[window]", "pixel")):0;
+	fconfig.ncolor.red=get_variable("[window]", "red")?atoi(get_variable("[window]", "red")):65535;
+	fconfig.ncolor.green=get_variable("[window]", "green")?atoi(get_variable("[window]", "green")):65535;
+	fconfig.ncolor.blue=get_variable("[window]", "blue")?atoi(get_variable("[window]", "blue")):65535;
+	fconfig.punit = atoi(get_variable("[mixer]", "phonehead"));
+	fconfig.ounit = atoi(get_variable("[mixer]", "out"));
+	fconfig.phonesysctl = atoi(get_variable("[mixer]", "phoneviasysctl"));
+
+
 
 	strcpy(mixer, fconfig.device);
 
