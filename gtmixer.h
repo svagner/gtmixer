@@ -6,7 +6,6 @@
 #include <gtk/gtk.h>
 
 #include "uthash.h"
-#include "ini.h"
 
 #include <sys/types.h>
 #include <sys/soundcard.h>
